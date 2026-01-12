@@ -1,6 +1,6 @@
 package models
 
 type VolunteerModel struct {
-	id   string
-	name string
+	ID   string `json:"id" bson:"_id,omitempty"`
+	Name string `json:"name" bson:"name"`
 }
