@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"fmt"
+	dtos "sheduling-server/DTOs"
 	"sheduling-server/models"
 	sub_model "sheduling-server/models/sub_models"
 	"sheduling-server/repository"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,10 +39,27 @@ func (h *DepartmentHandler) GetByID(c *gin.Context) {
 }
 
 func (h *DepartmentHandler) Create(c *gin.Context) {
-	var department models.DepartmentModel
-	if err := c.ShouldBindJSON(&department); err != nil {
+	var input dtos.Create_Department_Input
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Create the department with the initial head as a member
+	now := time.Now()
+	department := models.DepartmentModel{
+		DepartmentName: input.DepartmentName,
+		VolunteerMembers: []sub_model.MembershipInfo{
+			{
+				VolunteerID:    input.InitialHeadID,
+				JoinedDate:     now,
+				MembershipType: sub_model.HEAD,
+				LastUpdated:    now,
+			},
+		},
+		CreatedAt:   now,
+		LastUpdated: now,
+		IsDisabled:  false,
 	}
 
 	if err := h.db.Departments().CreateDepartment(c.Request.Context(), &department); err != nil {
@@ -48,7 +67,17 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(201, department)
+	// Return in the format expected by frontend
+	output := dtos.GetByID_Department_Output{
+		ID:               department.ID,
+		DepartmentName:   department.DepartmentName,
+		VolunteerMembers: department.VolunteerMembers,
+		CreatedAt:        department.CreatedAt,
+		LastUpdated:      department.LastUpdated,
+		IsDisabled:       department.IsDisabled,
+	}
+
+	c.JSON(201, output)
 }
 
 func (h *DepartmentHandler) Update(c *gin.Context) {
@@ -80,10 +109,19 @@ func (h *DepartmentHandler) Delete(c *gin.Context) {
 func (h *DepartmentHandler) AddMember(c *gin.Context) {
 	departmentID := c.Param("id")
 
-	var memberInfo sub_model.MembershipInfo
-	if err := c.ShouldBindJSON(&memberInfo); err != nil {
+	var input dtos.AddMember_Input
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Create MembershipInfo with timestamps
+	now := time.Now()
+	memberInfo := sub_model.MembershipInfo{
+		VolunteerID:    input.VolunteerID,
+		MembershipType: input.MembershipType,
+		JoinedDate:     now,
+		LastUpdated:    now,
 	}
 
 	if err := h.db.Departments().AddMemberToDepartment(c.Request.Context(), departmentID, &memberInfo); err != nil {

@@ -53,9 +53,9 @@ type EventList_Output struct {
 
 // for adding volunteer status to an event
 type Add_EventStatus_Input struct {
-	VolunteerID string    `json:"volunteerId" binding:"required"`
-	TimeIn      time.Time `json:"timeIn"`
-	TimeInType  string    `json:"timeInType" binding:"required,oneof=Present Late Excused"`
+	VolunteerID    string    `json:"volunteerId" binding:"required"`
+	TimeIn         time.Time `json:"timeIn"`
+	AttendanceType string    `json:"attendanceType" binding:"required,oneof=PRESENT LATE EXCUSED"`
 }
 
 // for updating volunteer status

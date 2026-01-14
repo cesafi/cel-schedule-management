@@ -9,6 +9,7 @@ import (
 	"sheduling-server/repository"
 	"sheduling-server/repository/firebase"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -52,6 +53,15 @@ func main() {
 	// Setup Gin router
 	r := gin.Default()
 
+	// Configure CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"}, // Frontend URLs
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+
 	// Health check
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -59,40 +69,50 @@ func main() {
 		})
 	})
 
-	// Volunteer routes
+	// Public auth routes (AUTH DISABLED FOR TESTING)
+	auth := r.Group("/api/auth")
+	{
+		auth.POST("/login", authUserHandler.Login)
+		auth.GET("/me", authUserHandler.GetCurrentUser) // middleware.RequireAuth() - DISABLED
+	}
+
+	// Protected routes - Volunteer routes (AUTH DISABLED FOR TESTING)
 	volunteers := r.Group("/api/volunteers")
+	// volunteers.Use(middleware.RequireAuth()) - DISABLED
 	{
 		volunteers.GET("", volunteerHandler.List)
 		volunteers.GET("/:id", volunteerHandler.GetByID)
 		volunteers.GET("/:id/status-history", eventHandler.GetVolunteerStatusHistory)
-		volunteers.POST("", volunteerHandler.Create)
-		volunteers.PUT("/:id", volunteerHandler.Update)
-		volunteers.DELETE("/:id", volunteerHandler.Delete)
+		volunteers.POST("", volunteerHandler.Create)       // middleware.RequireAdmin() - DISABLED
+		volunteers.PUT("/:id", volunteerHandler.Update)    // middleware.RequireAdmin() - DISABLED
+		volunteers.DELETE("/:id", volunteerHandler.Delete) // middleware.RequireAdmin() - DISABLED
 	}
 
-	// Department routes
+	// Protected routes - Department routes (AUTH DISABLED FOR TESTING)
 	departments := r.Group("/api/departments")
+	// departments.Use(middleware.RequireAuth()) - DISABLED
 	{
 		departments.GET("", departmentHandler.List)
 		departments.GET("/:id", departmentHandler.GetByID)
 		departments.GET("/:id/status-history", eventHandler.GetDepartmentStatusHistory)
-		departments.POST("", departmentHandler.Create)
-		departments.PUT("/:id", departmentHandler.Update)
-		departments.DELETE("/:id", departmentHandler.Delete)
-		departments.POST("/:id/members", departmentHandler.AddMember)
-		departments.PUT("/:id/members/:volunteerId", departmentHandler.UpdateMemberType)
+		departments.POST("", departmentHandler.Create)                                   // middleware.RequireAdmin() - DISABLED
+		departments.PUT("/:id", departmentHandler.Update)                                // middleware.RequireAdmin() - DISABLED
+		departments.DELETE("/:id", departmentHandler.Delete)                             // middleware.RequireAdmin() - DISABLED
+		departments.POST("/:id/members", departmentHandler.AddMember)                    // middleware.RequireDeptHead() - DISABLED
+		departments.PUT("/:id/members/:volunteerId", departmentHandler.UpdateMemberType) // middleware.RequireDeptHead() - DISABLED
 	}
 
-	// Event routes
+	// Protected routes - Event routes (AUTH DISABLED FOR TESTING)
 	events := r.Group("/api/events")
+	// events.Use(middleware.RequireAuth()) - DISABLED
 	{
 		events.GET("", eventHandler.List)
 		events.GET("/:id", eventHandler.GetByID)
-		events.POST("", eventHandler.Create)
-		events.PUT("/:id", eventHandler.Update)
-		events.DELETE("/:id", eventHandler.Delete)
-		events.POST("/:id/status", eventHandler.AddVolunteerStatus)
-		events.PUT("/:id/status/:volunteerId", eventHandler.UpdateVolunteerStatus)
+		events.POST("", eventHandler.Create)                                       // middleware.RequireAdmin() - DISABLED
+		events.PUT("/:id", eventHandler.Update)                                    // middleware.RequireAdmin() - DISABLED
+		events.DELETE("/:id", eventHandler.Delete)                                 // middleware.RequireAdmin() - DISABLED
+		events.POST("/:id/status", eventHandler.AddVolunteerStatus)                // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/status/:volunteerId", eventHandler.UpdateVolunteerStatus) // middleware.RequireDeptHead() - DISABLED
 	}
 
 	// Volunteer status history routes
@@ -101,8 +121,10 @@ func main() {
 	// Department status history routes
 	// r.GET("/api/departments/:departmentId/status-history", eventHandler.GetDepartmentStatusHistory)
 
-	// Auth User routes
+	// Auth User routes (Admin only) (AUTH DISABLED FOR TESTING)
 	authUsers := r.Group("/api/auth-users")
+	// authUsers.Use(middleware.RequireAuth()) - DISABLED
+	// authUsers.Use(middleware.RequireAdmin()) - DISABLED
 	{
 		authUsers.GET("", authUserHandler.List)
 		authUsers.GET("/:id", authUserHandler.GetByID)

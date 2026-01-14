@@ -46,6 +46,8 @@ type AuthUserRepository interface {
 	ListUsers(ctx context.Context) ([]*models.AuthUser, error)
 	// gets a user from thier ID
 	GetUserByID(ctx context.Context, id string) (*models.AuthUser, error)
+	// gets a user by their username (for login)
+	GetByUsername(ctx context.Context, username string) (*models.AuthUser, error)
 	// Updates a users info (prolly for changing access level)
 	UpdateUser(ctx context.Context, user *models.AuthUser) error
 }
