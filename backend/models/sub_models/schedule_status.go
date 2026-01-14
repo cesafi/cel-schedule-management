@@ -3,12 +3,12 @@ package sub_model
 import "time"
 
 type ScheduleStatus struct {
-	VolunteerID    string     `json:"volunteerID" bson:"volunteerID"`
-	TimeIn         time.Time  `json:"timeIn" bson:"timeIn"`
-	AttendanceType TimeInEnum `json:"attendanceType" bson:"attendanceType"`
-	TimeOut        time.Time  `json:"timeOut" bson:"timeOut"`
+	VolunteerID    string      `json:"volunteerID" bson:"volunteerID"`
+	TimeIn         time.Time   `json:"timeIn" bson:"timeIn"`
+	AttendanceType TimeInEnum  `json:"attendanceType" bson:"attendanceType"`
+	TimeOut        time.Time   `json:"timeOut" bson:"timeOut"`
 	TimeOutType    TimeOutEnum `json:"timeOutType" bson:"timeOutType"`
-	AssignedAt     time.Time  `json:"assignedAt" bson:"assignedAt"`
+	AssignedAt     time.Time   `json:"assignedAt" bson:"assignedAt"`
 }
 
 type TimeInEnum string

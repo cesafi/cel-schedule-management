@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"sheduling-server/DTOs"
+	dtos "sheduling-server/DTOs"
 	"sheduling-server/models"
 	sub_model "sheduling-server/models/sub_models"
 	"sheduling-server/repository"
