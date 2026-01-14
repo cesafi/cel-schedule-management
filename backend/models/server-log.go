@@ -10,4 +10,5 @@ type SystemLog struct {
 	TimeDetected time.Time
 	Metadata     map[string]interface{}
 	Type         sub_model.LogType
+	LastUpdated  time.Time
 }

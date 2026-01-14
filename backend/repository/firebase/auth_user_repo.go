@@ -18,8 +18,8 @@ type authUserRepo struct {
 
 const authUsersCollection = "auth_users"
 
-// Create adds a new auth user to Firestore
-func (r *authUserRepo) Create(ctx context.Context, user *models.AuthUser) error {
+// CreateUser adds a new auth user to Firestore
+func (r *authUserRepo) CreateUser(ctx context.Context, user *models.AuthUser) error {
 	if user.ID == "" {
 		// Auto-generate ID if not provided
 		docRef := r.firestore.Collection(authUsersCollection).NewDoc()
@@ -58,8 +58,8 @@ func (r *authUserRepo) GetByUsername(ctx context.Context, username string) (*mod
 	return &user, nil
 }
 
-// GetByID retrieves an auth user by their ID
-func (r *authUserRepo) GetByID(ctx context.Context, id string) (*models.AuthUser, error) {
+// GetUserByID retrieves an auth user by their ID
+func (r *authUserRepo) GetUserByID(ctx context.Context, id string) (*models.AuthUser, error) {
 	docSnap, err := r.firestore.Collection(authUsersCollection).Doc(id).Get(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth user: %v", err)
@@ -74,11 +74,38 @@ func (r *authUserRepo) GetByID(ctx context.Context, id string) (*models.AuthUser
 	return &user, nil
 }
 
-// Update updates an existing auth user
-func (r *authUserRepo) Update(ctx context.Context, user *models.AuthUser) error {
+// UpdateUser updates an existing auth user
+func (r *authUserRepo) UpdateUser(ctx context.Context, user *models.AuthUser) error {
 	_, err := r.firestore.Collection(authUsersCollection).Doc(user.ID).Set(ctx, user)
 	if err != nil {
 		return fmt.Errorf("failed to update auth user: %v", err)
 	}
 	return nil
+}
+
+// ListUsers retrieves all auth users
+func (r *authUserRepo) ListUsers(ctx context.Context) ([]*models.AuthUser, error) {
+	iter := r.firestore.Collection(authUsersCollection).Documents(ctx)
+	defer iter.Stop()
+
+	var users []*models.AuthUser
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate auth users: %v", err)
+		}
+
+		var user models.AuthUser
+		if err := doc.DataTo(&user); err != nil {
+			return nil, fmt.Errorf("failed to parse auth user data: %v", err)
+		}
+
+		user.ID = doc.Ref.ID
+		users = append(users, &user)
+	}
+
+	return users, nil
 }

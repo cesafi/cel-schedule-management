@@ -16,8 +16,8 @@ type volunteerRepo struct {
 
 const volunteersCollection = "volunteers"
 
-// Create adds a new volunteer to Firestore
-func (r *volunteerRepo) Create(ctx context.Context, volunteer *models.VolunteerModel) error {
+// CreateVolunteer adds a new volunteer to Firestore
+func (r *volunteerRepo) CreateVolunteer(ctx context.Context, volunteer *models.VolunteerModel) error {
 	if volunteer.ID == "" {
 		// Auto-generate ID if not provided
 		docRef := r.firestore.Collection(volunteersCollection).NewDoc()
@@ -31,8 +31,8 @@ func (r *volunteerRepo) Create(ctx context.Context, volunteer *models.VolunteerM
 	return nil
 }
 
-// GetByID retrieves a volunteer by their ID
-func (r *volunteerRepo) GetByID(ctx context.Context, id string) (*models.VolunteerModel, error) {
+// GetVolunteerByID retrieves a volunteer by their ID
+func (r *volunteerRepo) GetVolunteerByID(ctx context.Context, id string) (*models.VolunteerModel, error) {
 	docSnap, err := r.firestore.Collection(volunteersCollection).Doc(id).Get(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get volunteer: %v", err)
@@ -47,8 +47,8 @@ func (r *volunteerRepo) GetByID(ctx context.Context, id string) (*models.Volunte
 	return &volunteer, nil
 }
 
-// Update updates an existing volunteer
-func (r *volunteerRepo) Update(ctx context.Context, volunteer *models.VolunteerModel) error {
+// UpdateVolunteer updates an existing volunteer
+func (r *volunteerRepo) UpdateVolunteer(ctx context.Context, volunteer *models.VolunteerModel) error {
 	_, err := r.firestore.Collection(volunteersCollection).Doc(volunteer.ID).Set(ctx, volunteer)
 	if err != nil {
 		return fmt.Errorf("failed to update volunteer: %v", err)
@@ -56,8 +56,8 @@ func (r *volunteerRepo) Update(ctx context.Context, volunteer *models.VolunteerM
 	return nil
 }
 
-// Delete removes a volunteer from Firestore
-func (r *volunteerRepo) Delete(ctx context.Context, id string) error {
+// DeleteVolunteer removes a volunteer from Firestore
+func (r *volunteerRepo) DeleteVolunteer(ctx context.Context, id string) error {
 	_, err := r.firestore.Collection(volunteersCollection).Doc(id).Delete(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to delete volunteer: %v", err)
@@ -65,8 +65,8 @@ func (r *volunteerRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// List retrieves all volunteers
-func (r *volunteerRepo) List(ctx context.Context) ([]*models.VolunteerModel, error) {
+// ListVolunteer retrieves all volunteers
+func (r *volunteerRepo) ListVolunteer(ctx context.Context) ([]*models.VolunteerModel, error) {
 	iter := r.firestore.Collection(volunteersCollection).Documents(ctx)
 	defer iter.Stop()
 

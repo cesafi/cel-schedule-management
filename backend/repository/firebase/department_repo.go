@@ -3,8 +3,10 @@ package firebase
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"sheduling-server/models"
+	sub_model "sheduling-server/models/sub_models"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -16,8 +18,8 @@ type departmentRepo struct {
 
 const departmentsCollection = "departments"
 
-// Create adds a new department to Firestore
-func (r *departmentRepo) Create(ctx context.Context, dept *models.DepartmentModel) error {
+// CreateDepartment adds a new department to Firestore
+func (r *departmentRepo) CreateDepartment(ctx context.Context, dept *models.DepartmentModel) error {
 	if dept.ID == "" {
 		// Auto-generate ID if not provided
 		docRef := r.firestore.Collection(departmentsCollection).NewDoc()
@@ -47,8 +49,8 @@ func (r *departmentRepo) GetByID(ctx context.Context, id string) (*models.Depart
 	return &dept, nil
 }
 
-// Update updates an existing department
-func (r *departmentRepo) Update(ctx context.Context, dept *models.DepartmentModel) error {
+// UpdateDepartment updates an existing department
+func (r *departmentRepo) UpdateDepartment(ctx context.Context, dept *models.DepartmentModel) error {
 	_, err := r.firestore.Collection(departmentsCollection).Doc(dept.ID).Set(ctx, dept)
 	if err != nil {
 		return fmt.Errorf("failed to update department: %v", err)
@@ -56,8 +58,8 @@ func (r *departmentRepo) Update(ctx context.Context, dept *models.DepartmentMode
 	return nil
 }
 
-// Delete removes a department from Firestore
-func (r *departmentRepo) Delete(ctx context.Context, id string) error {
+// DeleteDepartment removes a department from Firestore
+func (r *departmentRepo) DeleteDepartment(ctx context.Context, id string) error {
 	_, err := r.firestore.Collection(departmentsCollection).Doc(id).Delete(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to delete department: %v", err)
@@ -65,8 +67,8 @@ func (r *departmentRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// List retrieves all departments
-func (r *departmentRepo) List(ctx context.Context) ([]*models.DepartmentModel, error) {
+// ListDepartments retrieves all departments
+func (r *departmentRepo) ListDepartments(ctx context.Context) ([]*models.DepartmentModel, error) {
 	iter := r.firestore.Collection(departmentsCollection).Documents(ctx)
 	defer iter.Stop()
 
@@ -90,4 +92,70 @@ func (r *departmentRepo) List(ctx context.Context) ([]*models.DepartmentModel, e
 	}
 
 	return departments, nil
+}
+
+// AddMemberToDepartment links a member to a department
+func (r *departmentRepo) AddMemberToDepartment(ctx context.Context, departmentID string, memberInfo *sub_model.MembershipInfo) error {
+	// Get the department first
+	dept, err := r.GetByID(ctx, departmentID)
+	if err != nil {
+		return fmt.Errorf("failed to get department: %v", err)
+	}
+
+	// Check if member already exists
+	for _, member := range dept.VolunteerMembers {
+		if member.VolunteerID == memberInfo.VolunteerID {
+			return fmt.Errorf("volunteer %s is already a member of this department", memberInfo.VolunteerID)
+		}
+	}
+
+	// Set joined date and last updated if not provided
+	if memberInfo.JoinedDate.IsZero() {
+		memberInfo.JoinedDate = time.Now()
+	}
+	memberInfo.LastUpdated = time.Now()
+
+	// Add the new member
+	dept.VolunteerMembers = append(dept.VolunteerMembers, *memberInfo)
+	dept.LastUpdated = time.Now()
+
+	// Update the department
+	if err := r.UpdateDepartment(ctx, dept); err != nil {
+		return fmt.Errorf("failed to add member to department: %v", err)
+	}
+
+	return nil
+}
+
+// UpdateMemberType updates the membership type of a member
+func (r *departmentRepo) UpdateMemberType(ctx context.Context, departmentID string, volunteerID string, newType string) error {
+	// Get the department first
+	dept, err := r.GetByID(ctx, departmentID)
+	if err != nil {
+		return fmt.Errorf("failed to get department: %v", err)
+	}
+
+	// Find and update the member's type
+	found := false
+	for i, member := range dept.VolunteerMembers {
+		if member.VolunteerID == volunteerID {
+			dept.VolunteerMembers[i].MembershipType = newType
+			dept.VolunteerMembers[i].LastUpdated = time.Now()
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("volunteer %s not found in department %s", volunteerID, departmentID)
+	}
+
+	dept.LastUpdated = time.Now()
+
+	// Update the department
+	if err := r.UpdateDepartment(ctx, dept); err != nil {
+		return fmt.Errorf("failed to update member type: %v", err)
+	}
+
+	return nil
 }

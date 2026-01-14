@@ -8,6 +8,7 @@ type ScheduleStatus struct {
 	TimeInType  TimeInEnum
 	TimeOut     time.Time
 	TimeOutType TimeOutEnum
+	AssignedAt  time.Time
 }
 
 type TimeInEnum string

@@ -70,6 +70,13 @@ func (db *FirebaseDB) AuthUsers() repository.AuthUserRepository {
 	}
 }
 
+// EventSchedules returns the event schedule repository implementation
+func (db *FirebaseDB) EventSchedules() repository.EventScheduleRepository {
+	return &eventScheduleRepo{
+		firestore: db.firestore,
+	}
+}
+
 // Close closes all Firebase connections
 func (db *FirebaseDB) Close() error {
 	return db.firestore.Close()
