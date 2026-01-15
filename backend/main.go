@@ -15,6 +15,7 @@ import (
 )
 
 func main() {
+	println("Starting Server")
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("Yeah no env, fuck y'all")

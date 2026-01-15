@@ -57,6 +57,7 @@ func (r *volunteerRepo) UpdateVolunteer(ctx context.Context, volunteer *models.V
 }
 
 // DeleteVolunteer removes a volunteer from Firestore
+// THIS IS UNUSED CUZ THIS HARD DELETES
 func (r *volunteerRepo) DeleteVolunteer(ctx context.Context, id string) error {
 	_, err := r.firestore.Collection(volunteersCollection).Doc(id).Delete(ctx)
 	if err != nil {
