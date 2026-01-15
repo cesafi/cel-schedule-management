@@ -5,12 +5,16 @@ export const authApi = {
   // Login - TODO: Backend endpoint not yet implemented
   async login(credentials: LoginDTO): Promise<LoginResponse> {
     const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
+    console.log("Called real login API with credentials:", credentials);
+    console.log("Received response:", response.data);
     return response.data;
   },
 
   // Get current user info
   async getCurrentUser(): Promise<AuthUser> {
     const response = await apiClient.get<AuthUser>('/auth/me');
+    console.log("Called getCurrentUser API");
+    console.log("Received response:", response.data);
     return response.data;
   },
 
