@@ -94,7 +94,7 @@ func (r *eventScheduleRepo) ListEvent(ctx context.Context) ([]*models.EventSched
 	return events, nil
 }
 
-// AddVolunteerStatus adds a volunteer status to an event (check-in)
+// AddVolunteerStatus adds a volunteer status to an event
 func (r *eventScheduleRepo) AddVolunteerStatus(ctx context.Context, eventID string, status *sub_model.ScheduleStatus) error {
 	// Get the event first
 	event, err := r.GetEventByID(ctx, eventID)
@@ -114,7 +114,7 @@ func (r *eventScheduleRepo) AddVolunteerStatus(ctx context.Context, eventID stri
 	return nil
 }
 
-// UpdateVolunteerStatus updates a volunteer status in an event (check-out)
+// UpdateVolunteerStatus updates a volunteer status in an event (check-in and check-out)
 func (r *eventScheduleRepo) UpdateVolunteerStatus(ctx context.Context, eventID string, volunteerID string, status *sub_model.ScheduleStatus) error {
 	// Get the event first
 	event, err := r.GetEventByID(ctx, eventID)
@@ -127,8 +127,14 @@ func (r *eventScheduleRepo) UpdateVolunteerStatus(ctx context.Context, eventID s
 	for i, s := range event.Statuses {
 		if s.VolunteerID == volunteerID {
 			// Update the status (typically for check-out)
-			event.Statuses[i].TimeOut = status.TimeOut
-			event.Statuses[i].TimeOutType = status.TimeOutType
+			if status.TimeOut.IsZero() == false {
+				event.Statuses[i].TimeOut = status.TimeOut
+				event.Statuses[i].TimeOutType = status.TimeOutType
+			}
+			if status.TimeIn.IsZero() == false {
+				event.Statuses[i].TimeIn = status.TimeIn
+				event.Statuses[i].AttendanceType = status.AttendanceType
+			}
 			found = true
 			break
 		}

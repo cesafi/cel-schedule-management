@@ -38,14 +38,23 @@ func (h *EventHandler) GetByID(c *gin.Context) {
 }
 
 func (h *EventHandler) Create(c *gin.Context) {
-	var event models.EventSchedule
-	if err := c.ShouldBindJSON(&event); err != nil {
+	var input dtos.Create_Event_Input
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	event.CreateAt = time.Now()
-	event.LastUpdated = time.Now()
+	event := models.EventSchedule{
+		Name:                input.Name,
+		Description:         input.Description,
+		TimeAndDate:         input.TimeAndDate,
+		ScheduledVolunteers: input.ScheduledVolunteers,
+		VoluntaryVolunteers: input.VoluntaryVolunteers,
+		AssignedGroups:      input.AssignedGroups,
+		IsDisabled:          false,
+		CreateAt:            time.Now(),
+		LastUpdated:         time.Now(),
+	}
 
 	if err := h.db.EventSchedules().CreateEvent(c.Request.Context(), &event); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -91,15 +100,16 @@ func (h *EventHandler) Update(c *gin.Context) {
 	if updateInput.TimeAndDate != nil {
 		existingEvent.TimeAndDate = *updateInput.TimeAndDate
 	}
-	if updateInput.ScheduledVolunteers != nil {
-		existingEvent.ScheduledVolunteers = updateInput.ScheduledVolunteers
-	}
-	if updateInput.VoluntaryVolunteers != nil {
-		existingEvent.VoluntaryVolunteers = updateInput.VoluntaryVolunteers
-	}
-	if updateInput.AssignedGroups != nil {
-		existingEvent.AssignedGroups = updateInput.AssignedGroups
-	}
+	// Should not be able to easly override the list types
+	// if updateInput.ScheduledVolunteers != nil {
+	// 	existingEvent.ScheduledVolunteers = updateInput.ScheduledVolunteers
+	// }
+	// if updateInput.VoluntaryVolunteers != nil {
+	// 	existingEvent.VoluntaryVolunteers = updateInput.VoluntaryVolunteers
+	// }
+	// if updateInput.AssignedGroups != nil {
+	// 	existingEvent.AssignedGroups = updateInput.AssignedGroups
+	// }
 	if updateInput.IsDisabled != nil {
 		existingEvent.IsDisabled = *updateInput.IsDisabled
 	}
@@ -114,15 +124,32 @@ func (h *EventHandler) Update(c *gin.Context) {
 	c.JSON(200, existingEvent)
 }
 
+// temporary deletion
 func (h *EventHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.EventSchedules().DeleteEvent(c.Request.Context(), id); err != nil {
+
+	existingEvent, err := h.db.EventSchedules().GetEventByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Event not found"})
+		return
+	}
+
+	if existingEvent.IsDisabled == true {
+		c.JSON(404, gin.H{"error": "Event is already deleted"})
+		return
+	}
+
+	existingEvent.LastUpdated = time.Now()
+	existingEvent.IsDisabled = true
+
+	if err := h.db.EventSchedules().UpdateEvent(c.Request.Context(), existingEvent); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(200, gin.H{"message": "Event deleted successfully"})
 }
 
+// assign a volunteer to an event
 func (h *EventHandler) AddVolunteerStatus(c *gin.Context) {
 	eventID := c.Param("id")
 
@@ -133,10 +160,8 @@ func (h *EventHandler) AddVolunteerStatus(c *gin.Context) {
 	}
 
 	status := sub_model.ScheduleStatus{
-		VolunteerID:    input.VolunteerID,
-		TimeIn:         input.TimeIn,
-		AttendanceType: sub_model.TimeInEnum(input.AttendanceType),
-		AssignedAt:     time.Now(),
+		VolunteerID: input.VolunteerID,
+		AssignedAt:  time.Now(),
 	}
 
 	if err := h.db.EventSchedules().AddVolunteerStatus(c.Request.Context(), eventID, &status); err != nil {
@@ -147,6 +172,7 @@ func (h *EventHandler) AddVolunteerStatus(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Volunteer status added successfully"})
 }
 
+// time in and timeouts
 func (h *EventHandler) UpdateVolunteerStatus(c *gin.Context) {
 	eventID := c.Param("id")
 	volunteerID := c.Param("volunteerId")
@@ -171,6 +197,51 @@ func (h *EventHandler) UpdateVolunteerStatus(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "Volunteer status updated successfully"})
 }
 
+// time in
+func (h *EventHandler) TimeOutVolunteer(c *gin.Context) {
+	eventID := c.Param("id")
+	volunteerID := c.Param("volunteerId")
+
+	var input dtos.TimeOut_EventStatus_Input
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if input.TimeOut.IsZero() {
+		input.TimeOut = time.Now()
+	}
+	status := sub_model.ScheduleStatus{
+		TimeOut:     input.TimeOut,
+		TimeOutType: sub_model.TimeOutEnum(input.TimeOutType),
+	}
+	if err := h.db.EventSchedules().UpdateVolunteerStatus(c.Request.Context(), eventID, volunteerID, &status); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+}
+
+// time in
+func (h *EventHandler) TimeInVolunteer(c *gin.Context) {
+	eventID := c.Param("id")
+	volunteerID := c.Param("volunteerId")
+
+	var input dtos.TimeIn_EventStatus_Input
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if input.TimeIn.IsZero() {
+		input.TimeIn = time.Now()
+	}
+	status := sub_model.ScheduleStatus{
+		TimeIn:         input.TimeIn,
+		AttendanceType: sub_model.TimeInEnum(input.TimeInType),
+	}
+	if err := h.db.EventSchedules().UpdateVolunteerStatus(c.Request.Context(), eventID, volunteerID, &status); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+}
 func (h *EventHandler) GetVolunteerStatusHistory(c *gin.Context) {
 	volunteerID := c.Param("id")
 

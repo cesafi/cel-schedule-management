@@ -53,9 +53,7 @@ type EventList_Output struct {
 
 // for adding volunteer status to an event
 type Add_EventStatus_Input struct {
-	VolunteerID    string    `json:"volunteerId" binding:"required"`
-	TimeIn         time.Time `json:"timeIn"`
-	AttendanceType string    `json:"attendanceType" binding:"required,oneof=PRESENT LATE EXCUSED"`
+	VolunteerID string `json:"volunteerId" binding:"required"`
 }
 
 // for updating volunteer status
@@ -63,6 +61,18 @@ type Update_EventStatus_Input struct {
 	VolunteerID string    `json:"volunteerId" binding:"required"`
 	TimeOut     time.Time `json:"timeOut" binding:"required"`
 	TimeOutType string    `json:"timeOutType" binding:"required,oneof='On-Time' 'Early Leave' Forgot Excused"`
+}
+
+// for time outs
+type TimeOut_EventStatus_Input struct {
+	TimeOut     time.Time `json:"timeOut,omitempty"`
+	TimeOutType string    `json:"timeOutType" binding:"required,oneof='On-Time' 'Early Leave' 'Forgot' 'Excused'"`
+}
+
+// for time ins
+type TimeIn_EventStatus_Input struct {
+	TimeIn     time.Time `json:"timeIn,omitempty"`
+	TimeInType string    `json:"timeInType" binding:"required,oneof='On-Time' 'Early Leave' 'Forgot' 'Excused'"`
 }
 
 // Output for getting all status history of a specific volunteer across all events
