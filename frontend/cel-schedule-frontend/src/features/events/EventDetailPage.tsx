@@ -204,13 +204,14 @@ export const EventDetailPage: React.FC = () => {
       title: 'Department',
       dataIndex: 'id',
       key: 'id',
-      render: (deptId: string) => {
+      render: (_: any, deptId: string) => {
         const dept = departments.find(d => d.id === deptId);
+        console.log("Debug Dept Info: ", deptId, dept);
         return dept ? (
           <Button type="link" onClick={() => navigate(`/departments/${deptId}`)}>
             {dept.departmentName}
           </Button>
-        ) : deptId;
+        ) : "Unknown";
       },
     },
     {
@@ -218,6 +219,7 @@ export const EventDetailPage: React.FC = () => {
       key: 'members',
       render: (_: any, deptId: string) => {
         const dept = departments.find(d => d.id === deptId);
+        console.log("Debug Dept Members: ", deptId, dept);
         return dept?.volunteerMembers?.length || 0;
       },
     },
@@ -301,7 +303,7 @@ export const EventDetailPage: React.FC = () => {
       >
         <Table
           columns={departmentColumns}
-          dataSource={event.assignedGroups || []}
+          dataSource={event.assignedGroups || ["XoX"]}
           rowKey={(deptId: string) => deptId}
           pagination={false}
         />
