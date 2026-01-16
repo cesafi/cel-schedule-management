@@ -99,10 +99,22 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 
 func (h *DepartmentHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Departments().DeleteDepartment(c.Request.Context(), id); err != nil {
+
+	department, err := h.db.Departments().GetByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Department not found"})
+		return
+	}
+	department.IsDisabled = true
+	if err := h.db.Departments().UpdateDepartment(c.Request.Context(), department); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	// if err := h.db.Departments().DeleteDepartment(c.Request.Context(), id); err != nil {
+	// 	c.JSON(500, gin.H{"error": err.Error()})
+	// 	return
+	// }
+
 	c.JSON(200, gin.H{"message": fmt.Sprintf("Department %s deleted successfully", id)})
 }
 
@@ -136,9 +148,7 @@ func (h *DepartmentHandler) UpdateMemberType(c *gin.Context) {
 	departmentID := c.Param("id")
 	volunteerID := c.Param("volunteerId")
 
-	var input struct {
-		MembershipType string `json:"membershipType" binding:"required"`
-	}
+	var input dtos.UpdateMemberType_Input
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return

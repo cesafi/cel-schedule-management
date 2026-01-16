@@ -46,6 +46,5 @@ type AddMember_Input struct {
 
 // for updating a member's type
 type UpdateMemberType_Input struct {
-	VolunteerID    string `json:"volunteerId" binding:"required"`
 	MembershipType string `json:"membershipType" binding:"required"`
 }
