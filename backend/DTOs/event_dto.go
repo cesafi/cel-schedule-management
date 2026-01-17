@@ -55,6 +55,9 @@ type EventList_Output struct {
 type Add_EventStatus_Input struct {
 	VolunteerID string `json:"volunteerId" binding:"required"`
 }
+type Add_DepartmentToEvent_Input struct {
+	DepartmentID []string `json:"departmentId" binding:"required"`
+}
 
 // for updating volunteer status
 type Update_EventStatus_Input struct {

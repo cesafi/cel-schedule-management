@@ -72,6 +72,8 @@ type EventScheduleRepository interface {
 	GetAllStatusOfVolunteer(ctx context.Context, id string) ([]*models.EventSchedule, error)
 	// Gets the statuses of all the volunteer in a specific department all the Events
 	GetAllStatusOfDepartment(ctx context.Context, dept_id string) ([]*models.EventSchedule, error)
+	//Adds the department to the event's assigned departments
+	AddDepartmentToEvent(ctx context.Context, eventID string, dept_id string) error
 }
 
 // Database interface - manages all repositories

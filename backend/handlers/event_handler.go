@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	dtos "sheduling-server/DTOs"
 	"sheduling-server/models"
 	sub_model "sheduling-server/models/sub_models"
@@ -264,4 +265,24 @@ func (h *EventHandler) GetDepartmentStatusHistory(c *gin.Context) {
 	}
 
 	c.JSON(200, events)
+}
+
+func (h *EventHandler) AddDepartmentToEvent(c *gin.Context) {
+	eventID := c.Param("id")
+
+	var input dtos.Add_DepartmentToEvent_Input
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	fmt.Printf("Adding: %d departments to %s", len(input.DepartmentID), eventID)
+	for _, deptID := range input.DepartmentID {
+		err := h.db.EventSchedules().AddDepartmentToEvent(c.Request.Context(), eventID, deptID)
+		if err != nil {
+			c.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(200, gin.H{"message": "Departments added to event successfully"})
 }

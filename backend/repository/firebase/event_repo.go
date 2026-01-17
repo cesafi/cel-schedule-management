@@ -197,10 +197,25 @@ func (r *eventScheduleRepo) GetAllStatusOfVolunteer(ctx context.Context, id stri
 
 // GetAllStatusOfDepartment gets the statuses of all volunteers in a department across all events
 func (r *eventScheduleRepo) GetAllStatusOfDepartment(ctx context.Context, dept_id string) ([]*models.EventSchedule, error) {
-	// Query events where the department is assigned
-	iter := r.firestore.Collection(eventsCollection).
-		Where("assignedGroups", "array-contains", dept_id).
-		Documents(ctx)
+	// First, get the department to get all volunteer member IDs
+	deptDoc, err := r.firestore.Collection("departments").Doc(dept_id).Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get department: %v", err)
+	}
+
+	var dept models.DepartmentModel
+	if err := deptDoc.DataTo(&dept); err != nil {
+		return nil, fmt.Errorf("failed to parse department data: %v", err)
+	}
+
+	// Create a map of volunteer IDs in the department for quick lookup
+	deptVolunteerIDs := make(map[string]bool)
+	for _, member := range dept.VolunteerMembers {
+		deptVolunteerIDs[member.VolunteerID] = true
+	}
+
+	// Query all events
+	iter := r.firestore.Collection(eventsCollection).Documents(ctx)
 	defer iter.Stop()
 
 	var events []*models.EventSchedule
@@ -219,8 +234,48 @@ func (r *eventScheduleRepo) GetAllStatusOfDepartment(ctx context.Context, dept_i
 		}
 
 		event.ID = doc.Ref.ID
-		events = append(events, &event)
+
+		// Filter statuses to only include volunteers in the department
+		filteredStatuses := []sub_model.ScheduleStatus{}
+		for _, status := range event.Statuses {
+			if deptVolunteerIDs[status.VolunteerID] {
+				filteredStatuses = append(filteredStatuses, status)
+			}
+		}
+
+		// Only include events that have at least one status for a department member
+		if len(filteredStatuses) > 0 {
+			event.Statuses = filteredStatuses
+			events = append(events, &event)
+		}
 	}
 
 	return events, nil
+}
+
+// AddDepartmentToEvent adds a department to an event's assigned groups
+func (r *eventScheduleRepo) AddDepartmentToEvent(ctx context.Context, eventID string, dept_id string) error {
+	// Get the event first
+	event, err := r.GetEventByID(ctx, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to get event: %v", err)
+	}
+
+	// Check if department is already assigned
+	for _, id := range event.AssignedGroups {
+		if id == dept_id {
+			return fmt.Errorf("department already assigned to event")
+		}
+	}
+
+	// Add the department to assigned groups
+	event.AssignedGroups = append(event.AssignedGroups, dept_id)
+	event.LastUpdated = time.Now()
+
+	// Update the event
+	if err := r.UpdateEvent(ctx, event); err != nil {
+		return fmt.Errorf("failed to add department to event: %v", err)
+	}
+
+	return nil
 }
