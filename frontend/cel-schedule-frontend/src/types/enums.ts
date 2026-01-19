@@ -14,13 +14,13 @@ export enum AttendanceType {
   PRESENT = "PRESENT",
   LATE = "LATE",
   EXCUSED = "EXCUSED",
-  ABSENT = "ABSENT",
 }
 
-export enum TimeType {
-  ON_TIME = "ON_TIME",
-  EARLY_LEAVE = "EARLY_LEAVE",
-  FORGOT_TO_CHECK_OUT = "FORGOT_TO_CHECK_OUT",
+export enum TimeOutType {
+  ONTIME = "On-Time",
+  EARYLEAVE = "Early Leave",
+  FORGOT = "Forgot",
+  EXCUSED = "Excused",
 }
 
 export enum LogType {

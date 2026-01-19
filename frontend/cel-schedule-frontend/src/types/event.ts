@@ -1,4 +1,4 @@
-import { AttendanceType, TimeType } from './enums';
+import { AttendanceType} from './enums';
 import { AddDepartmentToEventModal } from '../features/events/modals/AddDepartmentToEventModal';
 
 // Event Schedule types
@@ -8,7 +8,6 @@ export interface ScheduleStatus {
   timeIn?: string;
   timeOut?: string;
   attendanceType?: AttendanceType;
-  timeType?: TimeType;
 }
 
 export interface EventSchedule {
@@ -46,16 +45,24 @@ export interface EventUpdateDTO {
 
 export interface AddStatusDTO {
   volunteerID: string;
-  timeIn?: string;
-  attendanceType?: AttendanceType;
 }
 
 export interface UpdateStatusDTO {
-  timeOut?: string;
+  timeIn?: string;
   attendanceType?: AttendanceType;
-  timeType?: TimeType;
+  timeOut?: string;
 }
 
 export interface AddDepartmentToEventDTO {
   departmentIDs: string[];
+}
+
+export interface TimeInDTO {
+  timeIn?: string;
+  timeInType: string;
+}
+
+export interface TimeOutDTO {
+  timeOut?: string;
+  timeOutType: string;
 }

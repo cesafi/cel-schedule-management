@@ -109,14 +109,16 @@ func main() {
 	{
 		events.GET("", eventHandler.List)
 		events.GET("/:id", eventHandler.GetByID)
-		events.POST("", eventHandler.Create)                                           // middleware.RequireAdmin() - DISABLED
-		events.PUT("/:id", eventHandler.Update)                                        // middleware.RequireAdmin() - DISABLED
-		events.DELETE("/:id", eventHandler.Delete)                                     // middleware.RequireAdmin() - DISABLED
-		events.POST("/:id/status", eventHandler.AddVolunteerStatus)                    // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId", eventHandler.UpdateVolunteerStatus)     // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:id/AddDepartment", eventHandler.AddDepartmentToEvent) // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId/TimeIn", eventHandler.TimeInVolunteer)    // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId/TimeOut", eventHandler.TimeOutVolunteer)  // middleware.RequireDeptHead() - DISABLED
+		events.POST("", eventHandler.Create)       // middleware.RequireAdmin() - DISABLED
+		events.PUT("/:id", eventHandler.Update)    // middleware.RequireAdmin() - DISABLED
+		events.DELETE("/:id", eventHandler.Delete) // middleware.RequireAdmin() - DISABLED
+		// statust stuff
+		events.POST("/:id/status", eventHandler.AddVolunteerStatus)                   // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/status/:volunteerId", eventHandler.UpdateVolunteerStatus)    // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/status/:volunteerId/TimeIn", eventHandler.TimeInVolunteer)   // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/status/:volunteerId/TimeOut", eventHandler.TimeOutVolunteer) // middleware.RequireDeptHead() - DISABLED
+		// department stuff
+		events.PUT("/:id/AddDepartment", eventHandler.AddDepartmentToEvent) // middleware.RequireDeptHead() - DISABLED
 	}
 
 	// Auth User routes (Admin only) (AUTH DISABLED FOR TESTING)

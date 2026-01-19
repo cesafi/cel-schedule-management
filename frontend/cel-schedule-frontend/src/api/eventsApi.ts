@@ -1,5 +1,5 @@
 import apiClient from './client';
-import { EventSchedule, EventCreateDTO, EventUpdateDTO, AddStatusDTO, UpdateStatusDTO } from '../types';
+import { EventSchedule, EventCreateDTO, EventUpdateDTO, AddStatusDTO, UpdateStatusDTO, TimeInDTO, TimeOutDTO } from '../types';
 
 export const eventsApi = {
   // Get all events
@@ -48,5 +48,17 @@ export const eventsApi = {
     const response = await apiClient.put<EventSchedule>(`/events/${id}/status/${volunteerId}`, data);
     console.log("updated status in event:", response.data);
     return response.data;
+  },
+
+  // Time In volunteer
+  async timeIn(id: string, volunteerId: string, data: TimeInDTO): Promise<void> {
+    await apiClient.put(`/events/${id}/status/${volunteerId}/TimeIn`, data);
+    console.log("timed in volunteer:", volunteerId);
+  },
+
+  // Time Out volunteer
+  async timeOut(id: string, volunteerId: string, data: TimeOutDTO): Promise<void> {
+    await apiClient.put(`/events/${id}/status/${volunteerId}/TimeOut`, data);
+    console.log("timed out volunteer:", volunteerId);
   },
 };

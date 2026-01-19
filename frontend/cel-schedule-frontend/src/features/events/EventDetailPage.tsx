@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Modal, Form, Select, Space, Input } from 'antd';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Modal, Form, Select, Space, Input, Tabs } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { eventsApi, volunteersApi, departmentsApi } from '../../api';
-import { EventSchedule, Volunteer, Department, AttendanceType, AddStatusDTO, UpdateStatusDTO, EventUpdateDTO } from '../../types';
+import { EventSchedule, Volunteer, Department, AddStatusDTO, UpdateStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
+import { AttendanceType, TimeOutType } from '../../types/enums';
 import { format } from 'date-fns';
 import { useAuth } from '../auth';
 import { AddVolunteerToEventModal } from './modals/AddVolunteerToEventModal';
@@ -19,13 +20,12 @@ export const EventDetailPage: React.FC = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkInModalOpen, setCheckInModalOpen] = useState(false);
-  const [checkOutModalOpen, setCheckOutModalOpen] = useState(false);
   const [addDeptModalOpen, setAddDeptModalOpen] = useState(false);
   const [addVolunteerModalOpen, setAddVolunteerModalOpen] = useState(false);
-  const [selectedVolunteerId, setSelectedVolunteerId] = useState<string>('');
-  const [checkInForm] = Form.useForm();
-  const [checkOutForm] = Form.useForm();
+  const [editingTimeIn, setEditingTimeIn] = useState<string | null>(null);
+  const [editingTimeOut, setEditingTimeOut] = useState<string | null>(null);
+  const [timeInForm] = Form.useForm();
+  const [timeOutForm] = Form.useForm();
 
   const fetchData = async () => {
     if (!id) return;
@@ -51,45 +51,40 @@ export const EventDetailPage: React.FC = () => {
     fetchData();
   }, [id]);
 
-  const handleCheckIn = async (values: any) => {
+  const handleTimeIn = async (volunteerId: string, values: any) => {
     if (!id) return;
     
     try {
-      const data: AddStatusDTO = {
-        volunteerID: values.volunteerID,
-        timeIn: new Date().toISOString(),
-        attendanceType: values.attendanceType,
+      const data: TimeInDTO = {
+        timeIn: values.timeIn ? `${new Date().toISOString().split('T')[0]}T${values.timeIn}:00Z` : undefined,
+        timeInType: values.attendanceType,
       };
-      await eventsApi.addStatus(id, data);
+      await eventsApi.timeIn(id, volunteerId, data);
       message.success('Volunteer checked in successfully');
-      setCheckInModalOpen(false);
-      checkInForm.resetFields();
+      setEditingTimeIn(null);
+      timeInForm.resetFields();
       fetchData();
     } catch (error) {
       message.error('Failed to check in volunteer');
     }
   };
 
-  const handleCheckOut = async (values: any) => {
-    if (!id || !selectedVolunteerId) return;
+  const handleTimeOut = async (volunteerId: string, values: any) => {
+    if (!id) return;
     
     try {
-      const data: UpdateStatusDTO = {
-        timeOut: new Date().toISOString(),
+      const data: TimeOutDTO = {
+        timeOut: values.timeOut ? `${new Date().toISOString().split('T')[0]}T${values.timeOut}:00Z` : undefined,
+        timeOutType: 'On-Time',
       };
-      await eventsApi.updateStatus(id, selectedVolunteerId, data);
+      await eventsApi.timeOut(id, volunteerId, data);
       message.success('Volunteer checked out successfully');
-      setCheckOutModalOpen(false);
-      checkOutForm.resetFields();
+      setEditingTimeOut(null);
+      timeOutForm.resetFields();
       fetchData();
     } catch (error) {
       message.error('Failed to check out volunteer');
     }
-  };
-
-  const openCheckOut = (volunteerId: string) => {
-    setSelectedVolunteerId(volunteerId);
-    setCheckOutModalOpen(true);
   };
 
   const handleAddDepartments = async (departmentIds: string[]) => {
@@ -155,47 +150,151 @@ export const EventDetailPage: React.FC = () => {
       },
     },
     {
-      title: 'Status',
-      dataIndex: 'attendanceType',
-      key: 'attendanceType',
-      render: (type: AttendanceType) => {
-        const colors: Record<string, string> = {
-          PRESENT: 'green',
-          LATE: 'orange',
-          EXCUSED: 'blue',
-          ABSENT: 'red',
-        };
-        return <Tag color={colors[type] || 'default'}>{type}</Tag>;
-      },
-    },
-    {
       title: 'Time In',
       dataIndex: 'timeIn',
       key: 'timeIn',
-      render: (time: string) => time ? format(new Date(time), 'HH:mm:ss') : '-',
+      render: (time: string, record: any) => {
+        if (!record.attendanceType && editingTimeIn === record.volunteerID) {
+          return (
+            <Form
+              form={timeInForm}
+              layout="inline"
+              onFinish={(values) => handleTimeIn(record.volunteerID, values)}
+              style={{ display: 'flex', gap: '8px' }}
+            >
+              <Form.Item
+                name="attendanceType"
+                rules={[{ required: true, message: 'Required' }]}
+                style={{ marginBottom: 0 }}
+              >
+                <Select placeholder="Status" style={{ width: 120 }}>
+                  <Select.Option value={AttendanceType.PRESENT}>Present</Select.Option>
+                  <Select.Option value={AttendanceType.LATE}>Late</Select.Option>
+                  <Select.Option value={AttendanceType.EXCUSED}>Excused</Select.Option>
+                </Select>
+              </Form.Item>
+              <Form.Item name="timeIn" style={{ marginBottom: 0 }}>
+                <Input type="time" placeholder="Time" style={{ width: 100 }} />
+              </Form.Item>
+              <Button type="primary" size="small" htmlType="submit">
+                Submit
+              </Button>
+              <Button size="small" onClick={() => setEditingTimeIn(null)}>
+                Cancel
+              </Button>
+            </Form>
+          );
+        }
+        
+        if (!record.attendanceType) {
+          return (
+            <Button 
+              type="link" 
+              onClick={() => setEditingTimeIn(record.volunteerID)}
+            >
+              Check In
+            </Button>
+          );
+        }
+
+        return (
+          <Space>
+            <Tag color={record.attendanceType === AttendanceType.PRESENT ? 'green' : record.attendanceType === AttendanceType.LATE ? 'orange' : 'blue'}>
+              {record.attendanceType}
+            </Tag>
+            <span>{time ? format(new Date(time), 'MMM dd, yyyy h:mm:ss a') : '-'}</span>
+            <Button 
+              type="link" 
+              size="small"
+              onClick={() => {
+                setEditingTimeIn(record.volunteerID);
+                timeInForm.setFieldsValue({
+                  attendanceType: record.attendanceType,
+                  timeIn: time ? format(new Date(time), 'HH:mm') : '',
+                });
+              }}
+            >
+              Edit
+            </Button>
+          </Space>
+        );
+      },
     },
     {
       title: 'Time Out',
       dataIndex: 'timeOut',
       key: 'timeOut',
-      render: (time: string) => time ? format(new Date(time), 'HH:mm:ss') : '-',
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: any, record: any) => (
-        <Space>
-          {!record.timeOut && (
-            <Button
-              type="link"
-              icon={<ClockCircleOutlined />}
-              onClick={() => openCheckOut(record.volunteerID)}
+      render: (time: string, record: any) => {
+        if (!record.timeOutType && editingTimeOut === record.volunteerID) {
+          return (
+            <Form
+              form={timeOutForm}
+              layout="inline"
+              onFinish={(values) => handleTimeOut(record.volunteerID, values)}
+              style={{ display: 'flex', gap: '8px' }}
+            >
+              <Form.Item
+                name="timeOutType"
+                rules={[{ required: true, message: 'Required' }]}
+                style={{ marginBottom: 0 }}
+              >
+                <Select placeholder="Status" style={{ width: 120 }}>
+                  <Select.Option value={TimeOutType.ONTIME}>On-Time</Select.Option>
+                  <Select.Option value={TimeOutType.EARYLEAVE}>Early Leave</Select.Option>
+                  <Select.Option value={TimeOutType.FORGOT}>Forgot</Select.Option>
+                  <Select.Option value={TimeOutType.EXCUSED}>Excused</Select.Option>
+                </Select>
+              </Form.Item>
+              <Form.Item name="timeOut" style={{ marginBottom: 0 }}>
+                <Input type="time" placeholder="Time" style={{ width: 100 }} />
+              </Form.Item>
+              <Button type="primary" size="small" htmlType="submit">
+                Submit
+              </Button>
+              <Button size="small" onClick={() => setEditingTimeOut(null)}>
+                Cancel
+              </Button>
+            </Form>
+          );
+        }
+        
+        if (!record.timeOutType && record.attendanceType) {
+          return (
+            <Button 
+              type="link" 
+              onClick={() => setEditingTimeOut(record.volunteerID)}
             >
               Check Out
             </Button>
-          )}
-        </Space>
-      ),
+          );
+        }
+
+        if (record.timeOutType) {
+          return (
+            <Space>
+              <Tag color={record.timeOutType === TimeOutType.ONTIME ? 'green' : record.timeOutType === TimeOutType.EARYLEAVE ? 'orange' : 'red'}>
+                {record.timeOutType}
+              </Tag>
+              <span>{time ? format(new Date(time), 'MMM dd, yyyy h:mm:ss a') : '-'}</span>
+              <Button 
+                type="link" 
+                size="small"
+                onClick={() => {
+                  setEditingTimeOut(record.volunteerID);
+                  timeOutForm.setFieldsValue({
+                    timeOutType: record.timeOutType,
+                    timeOut: time ? format(new Date(time), 'HH:mm') : '',
+                  });
+                }}
+              >
+                Edit
+              </Button>
+            </Space>
+          );
+        }
+
+        return '-';
+      },
     },
   ];
 
@@ -240,6 +339,10 @@ export const EventDetailPage: React.FC = () => {
     v => !v.isDisabled && !(event.scheduledVolunteers || []).includes(v.id)
   );
 
+  const volunteersNotInAttendance = (event.scheduledVolunteers || []).filter(
+    vid => !(event.statuses || []).some(s => s.volunteerID === vid)
+  );
+
   const scheduledVolunteerColumns = [
     {
       title: 'Volunteer',
@@ -254,6 +357,26 @@ export const EventDetailPage: React.FC = () => {
       },
     },
   ];
+
+  const handleAddVolunteersToAttendance = async (volunteerIds: string[]) => {
+    if (!id) return;
+    
+    try {
+      // Add each volunteer to the event statuses (without timeIn initially)
+      for (const volunteerId of volunteerIds) {
+        const data: AddStatusDTO = {
+          volunteerID: volunteerId,
+        };
+        await eventsApi.addStatus(id, data);
+      }
+      message.success('Volunteers added to attendance');
+      setAddVolunteerModalOpen(false);
+      fetchData();
+    } catch (error) {
+      message.error('Failed to add volunteers to attendance');
+      throw error;
+    }
+  };
 
   return (
     <div>
@@ -288,140 +411,59 @@ export const EventDetailPage: React.FC = () => {
         </Descriptions>
       </Card>
 
-      <Card 
-        style={{ marginTop: 24 }} 
-        title="Assigned Departments"
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setAddDeptModalOpen(true)}
-          >
-            Add Department
-          </Button>
-        }
-      >
-        <Table
-          columns={departmentColumns}
-          dataSource={event.assignedGroups || ["XoX"]}
-          rowKey={(deptId: string) => deptId}
-          pagination={false}
+      <Card style={{ marginTop: 24 }}>
+        <Tabs
+          defaultActiveKey="departments"
+          items={[
+            {
+              key: 'departments',
+              label: 'Assigned Departments',
+              children: (
+                <>
+                  <div style={{ marginBottom: 16, textAlign: 'right' }}>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => setAddDeptModalOpen(true)}
+                    >
+                      Add Department
+                    </Button>
+                  </div>
+                  <Table
+                    columns={departmentColumns}
+                    dataSource={event.assignedGroups || []}
+                    rowKey={(deptId: string) => deptId}
+                    pagination={false}
+                  />
+                </>
+              ),
+            },
+            {
+              key: 'attendance',
+              label: 'Attendance',
+              children: (
+                <>
+                  <div style={{ marginBottom: 16, textAlign: 'right' }}>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => setAddVolunteerModalOpen(true)}
+                    >
+                      Add Volunteer
+                    </Button>
+                  </div>
+                  <Table
+                    columns={attendanceColumns}
+                    dataSource={event.statuses}
+                    rowKey="volunteerID"
+                    pagination={false}
+                  />
+                </>
+              ),
+            },
+          ]}
         />
       </Card>
-
-      <Card 
-        style={{ marginTop: 24 }} 
-        title="Scheduled Volunteers"
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setAddVolunteerModalOpen(true)}
-          >
-            Add Volunteer
-          </Button>
-        }
-      >
-        <Table
-          columns={scheduledVolunteerColumns}
-          dataSource={event.scheduledVolunteers || []}
-          rowKey={(volunteerId: string) => volunteerId}
-          pagination={false}
-        />
-      </Card>
-
-      <Card 
-        style={{ marginTop: 24 }} 
-        title="Attendance"
-        extra={
-          <Button
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            onClick={() => setCheckInModalOpen(true)}
-          >
-            Check In Volunteer
-          </Button>
-        }
-      >
-        <Table
-          columns={attendanceColumns}
-          dataSource={event.statuses}
-          rowKey="volunteerID"
-          pagination={false}
-        />
-      </Card>
-
-      {/* Check In Modal */}
-      <Modal
-        title="Check In Volunteer"
-        open={checkInModalOpen}
-        onCancel={() => {
-          setCheckInModalOpen(false);
-          checkInForm.resetFields();
-        }}
-        footer={null}
-      >
-        <Form form={checkInForm} layout="vertical" onFinish={handleCheckIn}>
-          <Form.Item
-            name="volunteerID"
-            label="Volunteer"
-            rules={[{ required: true, message: 'Please select a volunteer' }]}
-          >
-            <Select
-              placeholder="Select volunteer"
-              showSearch
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={availableVolunteers.map(v => ({ label: v.name, value: v.id }))}
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="attendanceType"
-            label="Attendance Type"
-            rules={[{ required: true, message: 'Please select attendance type' }]}
-            initialValue={AttendanceType.PRESENT}
-          >
-            <Select>
-              <Select.Option value={AttendanceType.PRESENT}>Present</Select.Option>
-              <Select.Option value={AttendanceType.LATE}>Late</Select.Option>
-              <Select.Option value={AttendanceType.EXCUSED}>Excused</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                Check In
-              </Button>
-              <Button onClick={() => setCheckInModalOpen(false)}>Cancel</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Check Out Modal */}
-      <Modal
-        title="Check Out Volunteer"
-        open={checkOutModalOpen}
-        onCancel={() => {
-          setCheckOutModalOpen(false);
-          checkOutForm.resetFields();
-        }}
-        footer={null}
-      >
-        <Form form={checkOutForm} layout="vertical" onFinish={handleCheckOut}>
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                Check Out
-              </Button>
-              <Button onClick={() => setCheckOutModalOpen(false)}>Cancel</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
 
       {/* Add Department Modal */}
       <AddDepartmentToEventModal
@@ -434,9 +476,9 @@ export const EventDetailPage: React.FC = () => {
       {/* Add Volunteer Modal */}
       <AddVolunteerToEventModal
         open={addVolunteerModalOpen}
-        availableVolunteers={unscheduledVolunteers}
+        availableVolunteers={volunteers.filter(v => !v.isDisabled && !event.statuses?.some(s => s.volunteerID === v.id))}
         onCancel={() => setAddVolunteerModalOpen(false)}
-        onSubmit={handleAddVolunteers}
+        onSubmit={handleAddVolunteersToAttendance}
       />
     </div>
   );

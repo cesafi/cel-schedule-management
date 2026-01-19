@@ -185,9 +185,23 @@ func (h *EventHandler) UpdateVolunteerStatus(c *gin.Context) {
 	}
 
 	status := sub_model.ScheduleStatus{
-		VolunteerID: input.VolunteerID,
-		TimeOut:     input.TimeOut,
-		TimeOutType: sub_model.TimeOutEnum(input.TimeOutType),
+		VolunteerID: volunteerID,
+	}
+
+	// Update TimeIn if provided
+	if !input.TimeIn.IsZero() {
+		status.TimeIn = input.TimeIn
+		if input.AttendanceType != "" {
+			status.AttendanceType = sub_model.TimeInEnum(input.AttendanceType)
+		}
+	}
+
+	// Update TimeOut if provided
+	if !input.TimeOut.IsZero() {
+		status.TimeOut = input.TimeOut
+		if input.TimeOutType != "" {
+			status.TimeOutType = sub_model.TimeOutEnum(input.TimeOutType)
+		}
 	}
 
 	if err := h.db.EventSchedules().UpdateVolunteerStatus(c.Request.Context(), eventID, volunteerID, &status); err != nil {
