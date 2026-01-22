@@ -105,7 +105,8 @@ func (r *eventScheduleRepo) AddVolunteerStatus(ctx context.Context, eventID stri
 	// Append the new status
 	event.Statuses = append(event.Statuses, *status)
 	event.LastUpdated = time.Now()
-
+	// should have checker for the volunteered volunteers
+	event.ScheduledVolunteers = append(event.ScheduledVolunteers, status.VolunteerID)
 	// Update the event
 	if err := r.UpdateEvent(ctx, event); err != nil {
 		return fmt.Errorf("failed to add volunteer status: %v", err)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, data } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { volunteersApi } from '../../api';
@@ -52,8 +52,8 @@ export const VolunteerDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'eventName',
-      key: 'eventName',
+      dataIndex: 'name',
+      key: 'name',
     },
     {
       title: 'Date',
@@ -90,8 +90,9 @@ export const VolunteerDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: StatusHistoryItem) => (
-        <Button type="link" onClick={() => navigate(`/events/${record.eventId}`)}>
+      dataIndex: 'id',
+      render: (id:string) => (
+        <Button type="link" onClick={() => navigate(`/events/${id}`)}>
           View Event
         </Button>
       ),

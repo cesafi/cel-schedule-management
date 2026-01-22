@@ -17,6 +17,7 @@ export const volunteersApi = {
   // Get volunteer status history
   async getStatusHistory(id: string): Promise<StatusHistoryItem[]> {
     const response = await apiClient.get<StatusHistoryItem[]>(`/volunteers/${id}/status-history`);
+    console.log("fetched volunteer status history:", response.data);
     return response.data;
   },
 

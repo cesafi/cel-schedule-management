@@ -26,6 +26,9 @@ export const EventDetailPage: React.FC = () => {
   const [editingTimeOut, setEditingTimeOut] = useState<string | null>(null);
   const [timeInForm] = Form.useForm();
   const [timeOutForm] = Form.useForm();
+  const [filterDepartment, setFilterDepartment] = useState<string | null>(null);
+  const [filterTimeIn, setFilterTimeIn] = useState<string | null>(null);
+  const [filterTimeOut, setFilterTimeOut] = useState<string | null>(null);
 
   const fetchData = async () => {
     if (!id) return;
@@ -131,11 +134,22 @@ export const EventDetailPage: React.FC = () => {
     return <div>Event not found</div>;
   }
 
+  const getVolunteerDepartments = (volunteerId: string) => {
+    return departments.filter(d => 
+      d.volunteerMembers?.some(m => m.volunteerID === volunteerId)
+    );
+  };
+
   const attendanceColumns = [
     {
       title: 'Volunteer',
       dataIndex: 'volunteerID',
       key: 'volunteerID',
+      sorter: (a: any, b: any) => {
+        const volA = volunteers.find(v => v.id === a.volunteerID);
+        const volB = volunteers.find(v => v.id === b.volunteerID);
+        return (volA?.name || '').localeCompare(volB?.name || '');
+      },
       render: (volunteerId: string) => {
         const volunteer = volunteers.find(v => v.id === volunteerId);
         return volunteer ? (
@@ -146,9 +160,40 @@ export const EventDetailPage: React.FC = () => {
       },
     },
     {
+      title: 'Department',
+      key: 'department',
+      sorter: (a: any, b: any) => {
+        const deptsA = getVolunteerDepartments(a.volunteerID);
+        const deptsB = getVolunteerDepartments(b.volunteerID);
+        const nameA = deptsA[0]?.departmentName || 'zzz';
+        const nameB = deptsB[0]?.departmentName || 'zzz';
+        return nameA.localeCompare(nameB);
+      },
+      render: (_: any, record: any) => {
+        const volunteerDepts = getVolunteerDepartments(record.volunteerID);
+        return volunteerDepts.length > 0 ? (
+          <Space wrap>
+            {volunteerDepts.map(d => (
+              <Tag key={d.id} color="blue">
+                {d.departmentName}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          <Tag color="default">No Department</Tag>
+        );
+      },
+    },
+    {
       title: 'Time In',
       dataIndex: 'timeIn',
       key: 'timeIn',
+      sorter: (a: any, b: any) => {
+        if (!a.timeIn && !b.timeIn) return 0;
+        if (!a.timeIn) return 1;
+        if (!b.timeIn) return -1;
+        return new Date(a.timeIn).getTime() - new Date(b.timeIn).getTime();
+      },
       render: (time: string, record: any) => {
         if (!record.attendanceType && editingTimeIn === record.volunteerID) {
           return (
@@ -220,6 +265,12 @@ export const EventDetailPage: React.FC = () => {
       title: 'Time Out',
       dataIndex: 'timeOut',
       key: 'timeOut',
+      sorter: (a: any, b: any) => {
+        if (!a.timeOut && !b.timeOut) return 0;
+        if (!a.timeOut) return 1;
+        if (!b.timeOut) return -1;
+        return new Date(a.timeOut).getTime() - new Date(b.timeOut).getTime();
+      },
       render: (time: string, record: any) => {
         if (!record.timeOutType && editingTimeOut === record.volunteerID) {
           return (
@@ -339,6 +390,33 @@ export const EventDetailPage: React.FC = () => {
     vid => !(event.statuses || []).some(s => s.volunteerID === vid)
   );
 
+  // Filter attendance data
+  const filteredAttendance = (event.statuses || []).filter((record) => {
+    // Filter by department
+    if (filterDepartment) {
+      const volunteerDepts = getVolunteerDepartments(record.volunteerID);
+      if (filterDepartment === 'none') {
+        if (volunteerDepts.length > 0) return false;
+      } else {
+        if (!volunteerDepts.some(d => d.id === filterDepartment)) return false;
+      }
+    }
+
+    // Filter by time in status (check attendanceType instead of timeIn)
+    if (filterTimeIn) {
+      if (filterTimeIn === 'yes' && !record.attendanceType) return false;
+      if (filterTimeIn === 'no' && record.attendanceType) return false;
+    }
+
+    // Filter by time out status (check timeOutType instead of timeOut)
+    if (filterTimeOut) {
+      if (filterTimeOut === 'yes' && !record.timeOutType) return false;
+      if (filterTimeOut === 'no' && record.timeOutType) return false;
+    }
+
+    return true;
+  });
+
   const scheduledVolunteerColumns = [
     {
       title: 'Volunteer',
@@ -439,7 +517,43 @@ export const EventDetailPage: React.FC = () => {
               label: 'Attendance',
               children: (
                 <>
-                  <div style={{ marginBottom: 16, textAlign: 'right' }}>
+                  <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <Space wrap>
+                      <Select
+                        placeholder="Filter by Department"
+                        style={{ width: 200 }}
+                        allowClear
+                        value={filterDepartment}
+                        onChange={setFilterDepartment}
+                      >
+                        <Select.Option value="none">No Department</Select.Option>
+                        {departments.filter(d => !d.isDisabled).map(d => (
+                          <Select.Option key={d.id} value={d.id}>
+                            {d.departmentName}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                      <Select
+                        placeholder="Filter by Time In"
+                        style={{ width: 160 }}
+                        allowClear
+                        value={filterTimeIn}
+                        onChange={setFilterTimeIn}
+                      >
+                        <Select.Option value="yes">Has Timed In</Select.Option>
+                        <Select.Option value="no">Not Timed In</Select.Option>
+                      </Select>
+                      <Select
+                        placeholder="Filter by Time Out"
+                        style={{ width: 160 }}
+                        allowClear
+                        value={filterTimeOut}
+                        onChange={setFilterTimeOut}
+                      >
+                        <Select.Option value="yes">Has Timed Out</Select.Option>
+                        <Select.Option value="no">Not Timed Out</Select.Option>
+                      </Select>
+                    </Space>
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
@@ -450,7 +564,7 @@ export const EventDetailPage: React.FC = () => {
                   </div>
                   <Table
                     columns={attendanceColumns}
-                    dataSource={event.statuses}
+                    dataSource={filteredAttendance}
                     rowKey="volunteerID"
                     pagination={false}
                   />
@@ -473,6 +587,7 @@ export const EventDetailPage: React.FC = () => {
       <AddVolunteerToEventModal
         open={addVolunteerModalOpen}
         availableVolunteers={volunteers.filter(v => !v.isDisabled && !event.statuses?.some(s => s.volunteerID === v.id))}
+        departments={departments}
         onCancel={() => setAddVolunteerModalOpen(false)}
         onSubmit={handleAddVolunteersToAttendance}
       />

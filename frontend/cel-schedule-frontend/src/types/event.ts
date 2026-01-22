@@ -1,4 +1,4 @@
-import { AttendanceType} from './enums';
+import { AttendanceType, TimeOutType } from './enums';
 import { AddDepartmentToEventModal } from '../features/events/modals/AddDepartmentToEventModal';
 
 // Event Schedule types
@@ -8,6 +8,7 @@ export interface ScheduleStatus {
   timeIn?: string;
   timeOut?: string;
   attendanceType?: AttendanceType;
+  timeOutType?: TimeOutType;
 }
 
 export interface EventSchedule {
