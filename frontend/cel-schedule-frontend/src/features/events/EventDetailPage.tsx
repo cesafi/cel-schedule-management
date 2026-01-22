@@ -490,29 +490,6 @@ export const EventDetailPage: React.FC = () => {
           defaultActiveKey="departments"
           items={[
             {
-              key: 'departments',
-              label: 'Assigned Departments',
-              children: (
-                <>
-                  <div style={{ marginBottom: 16, textAlign: 'right' }}>
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => setAddDeptModalOpen(true)}
-                    >
-                      Add Department
-                    </Button>
-                  </div>
-                  <Table
-                    columns={departmentColumns}
-                    dataSource={event.assignedGroups || []}
-                    rowKey={(deptId: string) => deptId}
-                    pagination={false}
-                  />
-                </>
-              ),
-            },
-            {
               key: 'attendance',
               label: 'Attendance',
               children: (
@@ -571,6 +548,29 @@ export const EventDetailPage: React.FC = () => {
                 </>
               ),
             },
+            {
+              key: 'departments',
+              label: 'Assigned Departments',
+              children: (
+                <>
+                  <div style={{ marginBottom: 16, textAlign: 'right' }}>
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => setAddDeptModalOpen(true)}
+                    >
+                      Add Department
+                    </Button>
+                  </div>
+                  <Table
+                    columns={departmentColumns}
+                    dataSource={event.assignedGroups || []}
+                    rowKey={(deptId: string) => deptId}
+                    pagination={false}
+                  />
+                </>
+              ),
+            }
           ]}
         />
       </Card>

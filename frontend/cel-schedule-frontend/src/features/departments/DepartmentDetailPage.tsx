@@ -123,7 +123,7 @@ export const DepartmentDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'eventName',
+      dataIndex: 'name',
       key: 'eventName',
     },
     {

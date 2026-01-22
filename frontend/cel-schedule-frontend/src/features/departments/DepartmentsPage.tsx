@@ -3,10 +3,11 @@ import { Typography, Table, Button, Space, message, Popconfirm, Tag } from 'antd
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { departmentsApi, volunteersApi } from '../../api';
-import { Department, DepartmentCreateDTO, Volunteer } from '../../types';
+import { Department, DepartmentCreateDTO, MembershipInfo, Volunteer } from '../../types';
 import { useAuth } from '../auth';
 import { format } from 'date-fns';
 import { DepartmentFormModal } from './modals/DepartmentFormModal';
+import { MembershipType } from '../../types/enums';
 
 const { Title } = Typography;
 
@@ -79,10 +80,19 @@ export const DepartmentsPage: React.FC = () => {
     },
     {
       title: 'Members',
-      dataIndex: 'members',
+      dataIndex: 'volunteerMembers',
       key: 'members',
       render: (members: any[]) => members?.length || 0,
     },
+    // WIP TODO
+    // {
+    //   title: 'Head',
+    //   dataIndex: 'volunteerMembers',
+    //   key: 'members',
+    //   render: (members: MembershipInfo[]) => members === MembershipType.Head ? 1 : 0,
+    // },
+
+
     {
       title: 'Status',
       dataIndex: 'isDisabled',
