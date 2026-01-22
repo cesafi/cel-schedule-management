@@ -91,11 +91,7 @@ export const EventDetailPage: React.FC = () => {
     if (!id || !event) return;
     
     try {
-      const updatedGroups = [...new Set([...(event.assignedGroups || []), ...departmentIds])];
-      const data: EventUpdateDTO = {
-        assignedGroups: updatedGroups,
-      };
-      await eventsApi.update(id, data);
+      await eventsApi.addDepartmentsToEvent(id, departmentIds);
       message.success('Departments added successfully');
       setAddDeptModalOpen(false);
       fetchData();

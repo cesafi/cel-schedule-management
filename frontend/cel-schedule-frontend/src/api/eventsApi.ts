@@ -61,4 +61,13 @@ export const eventsApi = {
     await apiClient.put(`/events/${id}/status/${volunteerId}/TimeOut`, data);
     console.log("timed out volunteer:", volunteerId);
   },
+
+  // Add departments to event
+  async addDepartmentsToEvent(id: string, departmentIds: string[]): Promise<void> {
+    await apiClient.put(`/events/${id}/AddDepartment`, {
+      departmentId: departmentIds
+    });
+    console.log("added departments to event:", departmentIds);
+  },
+
 };

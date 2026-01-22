@@ -264,7 +264,8 @@ func (r *eventScheduleRepo) AddDepartmentToEvent(ctx context.Context, eventID st
 	// Check if department is already assigned
 	for _, id := range event.AssignedGroups {
 		if id == dept_id {
-			return fmt.Errorf("department already assigned to event")
+			// skipp it
+			// return fmt.Errorf("department already assigned to event")
 		}
 	}
 
