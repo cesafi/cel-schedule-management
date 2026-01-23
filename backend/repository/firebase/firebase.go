@@ -19,10 +19,20 @@ type FirebaseDB struct {
 }
 
 // NewFirebaseDB initializes a new Firebase connection
-// credentialsPath: path to your Firebase service account JSON file
+// credentialsPath: path to your Firebase service account JSON file (optional if using credentialsJSON)
+// credentialsJSON: Firebase service account JSON as string (for production deployment)
 // projectID: your Firebase project ID
-func NewFirebaseDB(ctx context.Context, credentialsPath, projectID string) (*FirebaseDB, error) {
-	opt := option.WithCredentialsFile(credentialsPath)
+func NewFirebaseDB(ctx context.Context, credentialsPath, credentialsJSON, projectID string) (*FirebaseDB, error) {
+	var opt option.ClientOption
+
+	// Prefer JSON credentials (for production), fallback to file path (for local dev)
+	if credentialsJSON != "" {
+		opt = option.WithCredentialsJSON([]byte(credentialsJSON))
+	} else if credentialsPath != "" {
+		opt = option.WithCredentialsFile(credentialsPath)
+	} else {
+		return nil, fmt.Errorf("either FIREBASE_CREDENTIALS_JSON or FIREBASE_CREDENTIALS_PATH must be provided")
+	}
 
 	app, err := firebase.NewApp(ctx, &firebase.Config{
 		ProjectID: projectID,

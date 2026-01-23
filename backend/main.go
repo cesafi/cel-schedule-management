@@ -38,6 +38,7 @@ func main() {
 		db, err = firebase.NewFirebaseDB(
 			ctx,
 			getEnv("FIREBASE_CREDENTIALS_PATH", ""),
+			getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 			getEnv("FIREBASE_PROJECT_ID", ""),
 		)
 	default:
@@ -61,8 +62,17 @@ func main() {
 	r := gin.Default()
 
 	// Configure CORS
+	allowedOrigins := []string{
+		"http://localhost:5173",
+		"http://localhost:3000",
+	}
+	// Add production frontend URL if configured
+	if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
+		allowedOrigins = append(allowedOrigins, frontendURL)
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"}, // Frontend URLs
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
