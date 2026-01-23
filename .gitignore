@@ -1,0 +1,32 @@
+# Firebase Credentials
+backend/*.json
+!backend/go.mod
+!backend/go.sum
+
+# Environment files
+.env
+.env.local
+backend/.env
+
+# Frontend environment
+frontend/cel-schedule-frontend/.env.production
+frontend/cel-schedule-frontend/.env.local
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

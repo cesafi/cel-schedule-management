@@ -1,6 +1,6 @@
 module sheduling-server
 
-go 1.25.5
+go 1.25.0
 
 require (
 	cel.dev/expr v0.23.1 // indirect
