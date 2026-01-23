@@ -159,3 +159,37 @@ func (r *departmentRepo) UpdateMemberType(ctx context.Context, departmentID stri
 
 	return nil
 }
+
+// RemoveMemberFromDepartment removes a volunteer from a department
+func (r *departmentRepo) RemoveMemberFromDepartment(ctx context.Context, departmentID string, volunteerID string) error {
+	// Get the department first
+	dept, err := r.GetByID(ctx, departmentID)
+	if err != nil {
+		return fmt.Errorf("failed to get department: %v", err)
+	}
+
+	// Find and remove the member
+	found := false
+	newMembers := []sub_model.MembershipInfo{}
+	for _, member := range dept.VolunteerMembers {
+		if member.VolunteerID == volunteerID {
+			found = true
+			continue // Skip this member
+		}
+		newMembers = append(newMembers, member)
+	}
+
+	if !found {
+		return fmt.Errorf("volunteer %s not found in department %s", volunteerID, departmentID)
+	}
+
+	dept.VolunteerMembers = newMembers
+	dept.LastUpdated = time.Now()
+
+	// Update the department
+	if err := r.UpdateDepartment(ctx, dept); err != nil {
+		return fmt.Errorf("failed to remove member from department: %v", err)
+	}
+
+	return nil
+}

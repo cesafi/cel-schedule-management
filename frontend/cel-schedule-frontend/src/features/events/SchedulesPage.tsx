@@ -137,7 +137,9 @@ export const SchedulesPage: React.FC = () => {
           >
             View
           </Button>
-          {isAdmin && (
+          {
+          // isAdmin && 
+          (
             <>
               <Button
                 type="link"

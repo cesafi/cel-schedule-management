@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
 import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO } from '../../types';
 import { format } from 'date-fns';
@@ -53,6 +53,18 @@ export const DepartmentDetailPage: React.FC = () => {
     } catch (error) {
       message.error('Failed to add member');
       throw error;
+    }
+  };
+
+  const handleRemoveMember = async (volunteerId: string) => {
+    if (!id) return;
+    
+    try {
+      await departmentsApi.removeMember(id, volunteerId);
+      message.success('Member removed successfully');
+      fetchData();
+    } catch (error) {
+      message.error('Failed to remove member');
     }
   };
 
@@ -117,6 +129,23 @@ export const DepartmentDetailPage: React.FC = () => {
           return '-';
         }
       },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: any) => (
+        <Popconfirm
+          title="Remove member"
+          description="Are you sure you want to remove this member from the department?"
+          onConfirm={() => handleRemoveMember(record.volunteerID)}
+          okText="Yes"
+          cancelText="No"
+        >
+          <Button type="link" danger icon={<DeleteOutlined />}>
+            Remove
+          </Button>
+        </Popconfirm>
+      ),
     },
   ];
 

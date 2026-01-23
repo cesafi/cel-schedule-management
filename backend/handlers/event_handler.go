@@ -300,3 +300,27 @@ func (h *EventHandler) AddDepartmentToEvent(c *gin.Context) {
 
 	c.JSON(200, gin.H{"message": "Departments added to event successfully"})
 }
+
+func (h *EventHandler) RemoveDepartmentFromEvent(c *gin.Context) {
+	eventID := c.Param("id")
+	departmentID := c.Param("departmentId")
+
+	if err := h.db.EventSchedules().RemoveDepartmentFromEvent(c.Request.Context(), eventID, departmentID); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "Department removed from event successfully"})
+}
+
+func (h *EventHandler) RemoveVolunteerFromEvent(c *gin.Context) {
+	eventID := c.Param("id")
+	volunteerID := c.Param("volunteerId")
+
+	if err := h.db.EventSchedules().RemoveVolunteerFromEvent(c.Request.Context(), eventID, volunteerID); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "Volunteer removed from event successfully"})
+}

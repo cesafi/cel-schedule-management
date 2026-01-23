@@ -36,6 +36,8 @@ type DepartmentRepository interface {
 	AddMemberToDepartment(ctx context.Context, departmentID string, memberInfo *sub_model.MembershipInfo) error
 	// Updates the Membership Type of the member
 	UpdateMemberType(ctx context.Context, departmentID string, volunteerID string, newType string) error
+	// Removes a member from a Department
+	RemoveMemberFromDepartment(ctx context.Context, departmentID string, volunteerID string) error
 }
 
 // AuthUserRepository for auth users
@@ -74,6 +76,10 @@ type EventScheduleRepository interface {
 	GetAllStatusOfDepartment(ctx context.Context, dept_id string) ([]*models.EventSchedule, error)
 	//Adds the department to the event's assigned departments
 	AddDepartmentToEvent(ctx context.Context, eventID string, dept_id string) error
+	// Removes a department from the event's assigned groups (volunteers and statuses remain)
+	RemoveDepartmentFromEvent(ctx context.Context, eventID string, dept_id string) error
+	// Removes a volunteer from the event (removes from statuses and scheduledVolunteers)
+	RemoveVolunteerFromEvent(ctx context.Context, eventID string, volunteerID string) error
 }
 
 // Database interface - manages all repositories

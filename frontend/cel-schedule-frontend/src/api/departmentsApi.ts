@@ -56,4 +56,10 @@ export const departmentsApi = {
     console.log("updated member in department:", response.data);
     return response.data;
   },
+
+  // Remove member from department
+  async removeMember(id: string, volunteerId: string): Promise<void> {
+    await apiClient.delete(`/departments/${id}/members/${volunteerId}`);
+    console.log("removed member from department:", volunteerId);
+  },
 };

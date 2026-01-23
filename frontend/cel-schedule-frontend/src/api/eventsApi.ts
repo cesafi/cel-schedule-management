@@ -70,4 +70,16 @@ export const eventsApi = {
     console.log("added departments to event:", departmentIds);
   },
 
+  // Remove department from event
+  async removeDepartmentFromEvent(id: string, departmentId: string): Promise<void> {
+    await apiClient.delete(`/events/${id}/departments/${departmentId}`);
+    console.log("removed department from event:", departmentId);
+  },
+
+  // Remove volunteer from event
+  async removeVolunteerFromEvent(id: string, volunteerId: string): Promise<void> {
+    await apiClient.delete(`/events/${id}/status/${volunteerId}`);
+    console.log("removed volunteer from event:", volunteerId);
+  },
+
 };

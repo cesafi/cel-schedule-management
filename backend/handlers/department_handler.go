@@ -161,3 +161,15 @@ func (h *DepartmentHandler) UpdateMemberType(c *gin.Context) {
 
 	c.JSON(200, gin.H{"message": "Member type updated successfully"})
 }
+
+func (h *DepartmentHandler) RemoveMember(c *gin.Context) {
+	departmentID := c.Param("id")
+	volunteerID := c.Param("volunteerId")
+
+	if err := h.db.Departments().RemoveMemberFromDepartment(c.Request.Context(), departmentID, volunteerID); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "Member removed successfully"})
+}

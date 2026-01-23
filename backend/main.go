@@ -101,6 +101,7 @@ func main() {
 		departments.DELETE("/:id", departmentHandler.Delete)                             // middleware.RequireAdmin() - DISABLED
 		departments.POST("/:id/members", departmentHandler.AddMember)                    // middleware.RequireDeptHead() - DISABLED
 		departments.PUT("/:id/members/:volunteerId", departmentHandler.UpdateMemberType) // middleware.RequireDeptHead() - DISABLED
+		departments.DELETE("/:id/members/:volunteerId", departmentHandler.RemoveMember)  // middleware.RequireDeptHead() - DISABLED
 	}
 
 	// Protected routes - Event routes (AUTH DISABLED FOR TESTING)
@@ -113,12 +114,14 @@ func main() {
 		events.PUT("/:id", eventHandler.Update)    // middleware.RequireAdmin() - DISABLED
 		events.DELETE("/:id", eventHandler.Delete) // middleware.RequireAdmin() - DISABLED
 		// statust stuff
-		events.POST("/:id/status", eventHandler.AddVolunteerStatus)                   // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId", eventHandler.UpdateVolunteerStatus)    // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId/TimeIn", eventHandler.TimeInVolunteer)   // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId/TimeOut", eventHandler.TimeOutVolunteer) // middleware.RequireDeptHead() - DISABLED
+		events.POST("/:id/status", eventHandler.AddVolunteerStatus)                      // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/status/:volunteerId", eventHandler.UpdateVolunteerStatus)       // middleware.RequireDeptHead() - DISABLED
+		events.DELETE("/:id/status/:volunteerId", eventHandler.RemoveVolunteerFromEvent) // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/status/:volunteerId/TimeIn", eventHandler.TimeInVolunteer)      // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/status/:volunteerId/TimeOut", eventHandler.TimeOutVolunteer)    // middleware.RequireDeptHead() - DISABLED
 		// department stuff
-		events.PUT("/:id/AddDepartment", eventHandler.AddDepartmentToEvent) // middleware.RequireDeptHead() - DISABLED
+		events.PUT("/:id/AddDepartment", eventHandler.AddDepartmentToEvent)                     // middleware.RequireDeptHead() - DISABLED
+		events.DELETE("/:id/departments/:departmentId", eventHandler.RemoveDepartmentFromEvent) // middleware.RequireDeptHead() - DISABLED
 	}
 
 	// Auth User routes (Admin only) (AUTH DISABLED FOR TESTING)

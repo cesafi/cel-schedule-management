@@ -281,3 +281,93 @@ func (r *eventScheduleRepo) AddDepartmentToEvent(ctx context.Context, eventID st
 
 	return nil
 }
+
+// RemoveDepartmentFromEvent removes a department from an event's assigned groups (volunteers and their statuses remain)
+func (r *eventScheduleRepo) RemoveDepartmentFromEvent(ctx context.Context, eventID string, dept_id string) error {
+	// Get the event
+	event, err := r.GetEventByID(ctx, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to get event: %v", err)
+	}
+
+	// Remove the department from assigned groups
+	found := false
+	newAssignedGroups := []string{}
+	for _, groupID := range event.AssignedGroups {
+		if groupID == dept_id {
+			found = true
+			continue // Skip this department
+		}
+		newAssignedGroups = append(newAssignedGroups, groupID)
+	}
+
+	if !found {
+		return fmt.Errorf("department %s not found in event %s", dept_id, eventID)
+	}
+
+	event.AssignedGroups = newAssignedGroups
+	event.LastUpdated = time.Now()
+
+	// Update the event
+	if err := r.UpdateEvent(ctx, event); err != nil {
+		return fmt.Errorf("failed to remove department from event: %v", err)
+	}
+
+	return nil
+}
+
+// RemoveVolunteerFromEvent removes a volunteer from an event (removes from statuses and scheduledVolunteers)
+func (r *eventScheduleRepo) RemoveVolunteerFromEvent(ctx context.Context, eventID string, volunteerID string) error {
+	// Get the event
+	event, err := r.GetEventByID(ctx, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to get event: %v", err)
+	}
+
+	// Remove from statuses
+	statusFound := false
+	newStatuses := []sub_model.ScheduleStatus{}
+	for _, status := range event.Statuses {
+		if status.VolunteerID == volunteerID {
+			statusFound = true
+			continue // Skip this volunteer
+		}
+		newStatuses = append(newStatuses, status)
+	}
+
+	// Remove from scheduledVolunteers
+	scheduledFound := false
+	newScheduledVolunteers := []string{}
+	for _, vID := range event.ScheduledVolunteers {
+		if vID == volunteerID {
+			scheduledFound = true
+			continue // Skip this volunteer
+		}
+		newScheduledVolunteers = append(newScheduledVolunteers, vID)
+	}
+
+	// Remove from voluntaryVolunteers (in case they're there)
+	newVoluntaryVolunteers := []string{}
+	for _, vID := range event.VoluntaryVolunteers {
+		if vID == volunteerID {
+			continue // Skip this volunteer
+		}
+		newVoluntaryVolunteers = append(newVoluntaryVolunteers, vID)
+	}
+
+	if !statusFound && !scheduledFound {
+		return fmt.Errorf("volunteer %s not found in event %s", volunteerID, eventID)
+	}
+
+	event.Statuses = newStatuses
+	event.ScheduledVolunteers = newScheduledVolunteers
+	event.VoluntaryVolunteers = newVoluntaryVolunteers
+	event.LastUpdated = time.Now()
+
+	// Update the event
+	if err := r.UpdateEvent(ctx, event); err != nil {
+		return fmt.Errorf("failed to remove volunteer from event: %v", err)
+	}
+
+	return nil
+}

@@ -121,7 +121,9 @@ export const DepartmentsPage: React.FC = () => {
           >
             View
           </Button>
-          {isAdmin && (
+          {
+          // isAdmin && 
+          (
             <Popconfirm
               title="Delete department"
               description="Are you sure you want to delete this department?"

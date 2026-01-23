@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Modal, Form, Select, Space, Input, Tabs } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Modal, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, CheckCircleOutlined, ClockCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 import { eventsApi, volunteersApi, departmentsApi } from '../../api';
 import { EventSchedule, Volunteer, Department, AddStatusDTO, UpdateStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
@@ -100,7 +100,30 @@ export const EventDetailPage: React.FC = () => {
       fetchData();
     } catch (error) {
       message.error('Failed to add departments');
-      throw error;
+    }
+  };
+
+  const handleRemoveDepartment = async (departmentId: string) => {
+    if (!id) return;
+    
+    try {
+      await eventsApi.removeDepartmentFromEvent(id, departmentId);
+      message.success('Department removed successfully');
+      fetchData();
+    } catch (error) {
+      message.error('Failed to remove department');
+    }
+  };
+
+  const handleRemoveVolunteer = async (volunteerId: string) => {
+    if (!id) return;
+    
+    try {
+      await eventsApi.removeVolunteerFromEvent(id, volunteerId);
+      message.success('Volunteer removed from event successfully');
+      fetchData();
+    } catch (error) {
+      message.error('Failed to remove volunteer');
     }
   };
 
@@ -343,6 +366,23 @@ export const EventDetailPage: React.FC = () => {
         return '-';
       },
     },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: any) => (
+        <Popconfirm
+          title="Remove volunteer"
+          description="This will remove the volunteer's attendance record. Continue?"
+          onConfirm={() => handleRemoveVolunteer(record.volunteerID)}
+          okText="Yes"
+          cancelText="No"
+        >
+          <Button type="link" danger icon={<DeleteOutlined />}>
+            Remove
+          </Button>
+        </Popconfirm>
+      ),
+    },
   ];
 
   const departmentColumns = [
@@ -368,6 +408,23 @@ export const EventDetailPage: React.FC = () => {
         console.log("Debug Dept Members: ", deptId, dept);
         return dept?.volunteerMembers?.length || 0;
       },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, deptId: string) => (
+        <Popconfirm
+          title="Remove department"
+          description="Are you sure you want to remove this department from the event?"
+          onConfirm={() => handleRemoveDepartment(deptId)}
+          okText="Yes"
+          cancelText="No"
+        >
+          <Button type="link" danger icon={<DeleteOutlined />}>
+            Remove
+          </Button>
+        </Popconfirm>
+      ),
     },
   ];
 
