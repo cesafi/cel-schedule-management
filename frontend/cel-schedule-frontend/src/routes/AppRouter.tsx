@@ -17,14 +17,8 @@ export const AppRouter: React.FC = () => {
           {/* Public route */}
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Protected routes */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }
-          >
+          {/* Public routes with MainLayout - Anonymous users can view */}
+          <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/schedules" element={<SchedulesPage />} />
             <Route path="/events/:id" element={<EventDetailPage />} />
@@ -33,7 +27,7 @@ export const AppRouter: React.FC = () => {
             <Route path="/volunteers" element={<VolunteersPage />} />
             <Route path="/volunteers/:id" element={<VolunteerDetailPage />} />
 
-            {/* Admin only route */}
+            {/* Admin only route - Requires authentication and admin role */}
             <Route
               path="/admin"
               element={

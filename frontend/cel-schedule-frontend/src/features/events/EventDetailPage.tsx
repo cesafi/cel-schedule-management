@@ -15,7 +15,7 @@ const { Title } = Typography;
 export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isDeptHead, isAdmin } = useAuth();
+  const { isDeptHead, isAdmin, canManageVolunteer } = useAuth();
   const [event, setEvent] = useState<EventSchedule | null>(null);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -251,6 +251,10 @@ export const EventDetailPage: React.FC = () => {
         }
         
         if (!record.attendanceType) {
+          const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+          if (!canManage) {
+            return <span>-</span>;
+          }
           return (
             <Button 
               type="link" 
@@ -261,25 +265,28 @@ export const EventDetailPage: React.FC = () => {
           );
         }
 
+        const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
         return (
           <Space>
             <Tag color={record.attendanceType === AttendanceType.PRESENT ? 'green' : record.attendanceType === AttendanceType.LATE ? 'orange' : 'blue'}>
               {record.attendanceType}
             </Tag>
             <span>{time ? format(new Date(time), 'MMM dd, yyyy h:mm:ss a') : '-'}</span>
-            <Button 
-              type="link" 
-              size="small"
-              onClick={() => {
-                setEditingTimeIn(record.volunteerID);
-                timeInForm.setFieldsValue({
-                  attendanceType: record.attendanceType,
-                  timeIn: time ? format(new Date(time), 'HH:mm') : '',
-                });
-              }}
-            >
-              Edit
-            </Button>
+            {canManage && (
+              <Button 
+                type="link" 
+                size="small"
+                onClick={() => {
+                  setEditingTimeIn(record.volunteerID);
+                  timeInForm.setFieldsValue({
+                    attendanceType: record.attendanceType,
+                    timeIn: time ? format(new Date(time), 'HH:mm') : '',
+                  });
+                }}
+              >
+                Edit
+              </Button>
+            )}
           </Space>
         );
       },
@@ -329,6 +336,10 @@ export const EventDetailPage: React.FC = () => {
         }
         
         if (!record.timeOutType && record.attendanceType) {
+          const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+          if (!canManage) {
+            return <span>-</span>;
+          }
           return (
             <Button 
               type="link" 
@@ -340,25 +351,28 @@ export const EventDetailPage: React.FC = () => {
         }
 
         if (record.timeOutType) {
+          const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
           return (
             <Space>
               <Tag color={record.timeOutType === TimeOutType.ONTIME ? 'green' : record.timeOutType === TimeOutType.EARYLEAVE ? 'orange' : 'red'}>
                 {record.timeOutType}
               </Tag>
               <span>{time ? format(new Date(time), 'MMM dd, yyyy h:mm:ss a') : '-'}</span>
-              <Button 
-                type="link" 
-                size="small"
-                onClick={() => {
-                  setEditingTimeOut(record.volunteerID);
-                  timeOutForm.setFieldsValue({
-                    timeOutType: record.timeOutType,
-                    timeOut: time ? format(new Date(time), 'HH:mm') : '',
-                  });
-                }}
-              >
-                Edit
-              </Button>
+              {canManage && (
+                <Button 
+                  type="link" 
+                  size="small"
+                  onClick={() => {
+                    setEditingTimeOut(record.volunteerID);
+                    timeOutForm.setFieldsValue({
+                      timeOutType: record.timeOutType,
+                      timeOut: time ? format(new Date(time), 'HH:mm') : '',
+                    });
+                  }}
+                >
+                  Edit
+                </Button>
+              )}
             </Space>
           );
         }
@@ -369,19 +383,23 @@ export const EventDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: any) => (
-        <Popconfirm
-          title="Remove volunteer"
-          description="This will remove the volunteer's attendance record. Continue?"
-          onConfirm={() => handleRemoveVolunteer(record.volunteerID)}
-          okText="Yes"
-          cancelText="No"
-        >
-          <Button type="link" danger icon={<DeleteOutlined />}>
-            Remove
-          </Button>
-        </Popconfirm>
-      ),
+      render: (_: any, record: any) => {
+        const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+        if (!canManage) return null;
+        return (
+          <Popconfirm
+            title="Remove volunteer"
+            description="This will remove the volunteer's attendance record. Continue?"
+            onConfirm={() => handleRemoveVolunteer(record.volunteerID)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              Remove
+            </Button>
+          </Popconfirm>
+        );
+      },
     },
   ];
 
@@ -412,19 +430,22 @@ export const EventDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, deptId: string) => (
-        <Popconfirm
-          title="Remove department"
-          description="Are you sure you want to remove this department from the event?"
-          onConfirm={() => handleRemoveDepartment(deptId)}
-          okText="Yes"
-          cancelText="No"
-        >
-          <Button type="link" danger icon={<DeleteOutlined />}>
-            Remove
-          </Button>
-        </Popconfirm>
-      ),
+      render: (_: any, deptId: string) => {
+        if (!isAdmin) return null;
+        return (
+          <Popconfirm
+            title="Remove department"
+            description="Are you sure you want to remove this department from the event?"
+            onConfirm={() => handleRemoveDepartment(deptId)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              Remove
+            </Button>
+          </Popconfirm>
+        );
+      },
     },
   ];
 
@@ -588,13 +609,15 @@ export const EventDetailPage: React.FC = () => {
                         <Select.Option value="no">Not Timed Out</Select.Option>
                       </Select>
                     </Space>
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => setAddVolunteerModalOpen(true)}
-                    >
-                      Add Volunteer
-                    </Button>
+                    {(isAdmin || isDeptHead) && (
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => setAddVolunteerModalOpen(true)}
+                      >
+                        Add Volunteer
+                      </Button>
+                    )}
                   </div>
                   <Table
                     columns={attendanceColumns}
@@ -611,13 +634,15 @@ export const EventDetailPage: React.FC = () => {
               children: (
                 <>
                   <div style={{ marginBottom: 16, textAlign: 'right' }}>
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => setAddDeptModalOpen(true)}
-                    >
-                      Add Department
-                    </Button>
+                    {isAdmin && (
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => setAddDeptModalOpen(true)}
+                      >
+                        Add Department
+                      </Button>
+                    )}
                   </div>
                   <Table
                     columns={departmentColumns}

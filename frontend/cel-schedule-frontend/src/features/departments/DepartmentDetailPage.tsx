@@ -6,12 +6,14 @@ import { departmentsApi, volunteersApi } from '../../api';
 import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO } from '../../types';
 import { format } from 'date-fns';
 import { AddMemberModal } from './modals/AddMemberModal';
+import { useAuth } from '../auth';
 
 const { Title } = Typography;
 
 export const DepartmentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAdmin, isDeptHead, user, isHeadOfDepartment } = useAuth();
   const [department, setDepartment] = useState<Department | null>(null);
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
@@ -80,6 +82,9 @@ export const DepartmentDetailPage: React.FC = () => {
     return <div>Department not found</div>;
   }
 
+  // Check if user can manage this department
+  const canManage = isAdmin || (id ? isHeadOfDepartment(id) : false);
+
   const memberColumns = [
     {
       title: 'Volunteer',
@@ -133,19 +138,22 @@ export const DepartmentDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: any) => (
-        <Popconfirm
-          title="Remove member"
-          description="Are you sure you want to remove this member from the department?"
-          onConfirm={() => handleRemoveMember(record.volunteerID)}
-          okText="Yes"
-          cancelText="No"
-        >
-          <Button type="link" danger icon={<DeleteOutlined />}>
-            Remove
-          </Button>
-        </Popconfirm>
-      ),
+      render: (_: any, record: any) => {
+        if (!canManage) return null;
+        return (
+          <Popconfirm
+            title="Remove member"
+            description="Are you sure you want to remove this member from the department?"
+            onConfirm={() => handleRemoveMember(record.volunteerID)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              Remove
+            </Button>
+          </Popconfirm>
+        );
+      },
     },
   ];
 
@@ -222,9 +230,11 @@ export const DepartmentDetailPage: React.FC = () => {
         style={{ marginTop: 24 }} 
         title="Members"
         extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-            Add Member
-          </Button>
+          canManage && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+              Add Member
+            </Button>
+          )
         }
       >
         <Table

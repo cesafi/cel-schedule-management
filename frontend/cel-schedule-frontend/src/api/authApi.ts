@@ -1,8 +1,8 @@
 import apiClient from './client';
-import { LoginDTO, LoginResponse, AuthUser } from '../types';
+import { LoginDTO, LoginResponse, AuthUser, AuthUserCreateDTO } from '../types';
 
 export const authApi = {
-  // Login - TODO: Backend endpoint not yet implemented
+  // Login
   async login(credentials: LoginDTO): Promise<LoginResponse> {
     const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
     console.log("Called real login API with credentials:", credentials);
@@ -15,6 +15,12 @@ export const authApi = {
     const response = await apiClient.get<AuthUser>('/auth/me');
     console.log("Called getCurrentUser API");
     console.log("Received response:", response.data);
+    return response.data;
+  },
+
+  // Create new user (admin only)
+  async createUser(data: AuthUserCreateDTO): Promise<AuthUser> {
+    const response = await apiClient.post<AuthUser>('/auth-users', data);
     return response.data;
   },
 

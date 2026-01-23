@@ -18,10 +18,10 @@ func main() {
 	fmt.Println("=== CEL Scheduling System - Admin User Creator ===")
 	fmt.Println()
 
-	// Load environment variables - try current directory first, then parent
-	if err := godotenv.Load(".env"); err != nil {
+	// Load environment variables - try parent directories
+	if err := godotenv.Load("../../.env"); err != nil {
 		if err := godotenv.Load("../.env"); err != nil {
-			if err := godotenv.Load("../../.env"); err != nil {
+			if err := godotenv.Load(".env"); err != nil {
 				log.Println("Warning: No .env file found, using system environment variables")
 			}
 		}

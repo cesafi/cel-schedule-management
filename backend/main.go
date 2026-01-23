@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"sheduling-server/handlers"
+	"sheduling-server/middleware"
 	"sheduling-server/repository"
 	"sheduling-server/repository/firebase"
 
@@ -70,64 +71,74 @@ func main() {
 		})
 	})
 
-	// Public auth routes (AUTH DISABLED FOR TESTING)
+	// Public auth routes
 	auth := r.Group("/api/auth")
 	{
 		auth.POST("/login", authUserHandler.Login)
-		auth.GET("/me", authUserHandler.GetCurrentUser) // middleware.RequireAuth() - DISABLED
+		auth.GET("/me", middleware.RequireAuth(), authUserHandler.GetCurrentUser)
 	}
 
-	// Protected routes - Volunteer routes (AUTH DISABLED FOR TESTING)
+	// Volunteer routes - Public GET, Admin-only CUD
 	volunteers := r.Group("/api/volunteers")
-	// volunteers.Use(middleware.RequireAuth()) - DISABLED
 	{
+		// Public endpoints - anonymous can view volunteers
 		volunteers.GET("", volunteerHandler.List)
 		volunteers.GET("/:id", volunteerHandler.GetByID)
 		volunteers.GET("/:id/status-history", eventHandler.GetVolunteerStatusHistory)
-		volunteers.POST("", volunteerHandler.Create)       // middleware.RequireAdmin() - DISABLED
-		volunteers.PUT("/:id", volunteerHandler.Update)    // middleware.RequireAdmin() - DISABLED
-		volunteers.DELETE("/:id", volunteerHandler.Delete) // middleware.RequireAdmin() - DISABLED
+
+		// Admin-only endpoints
+		volunteers.POST("", middleware.RequireAuth(), middleware.RequireAdmin(), volunteerHandler.Create)
+		volunteers.PUT("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), volunteerHandler.Update)
+		volunteers.DELETE("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), volunteerHandler.Delete)
 	}
 
-	// Protected routes - Department routes (AUTH DISABLED FOR TESTING)
+	// Department routes - Public GET, Admin CUD, DeptHead member management
 	departments := r.Group("/api/departments")
-	// departments.Use(middleware.RequireAuth()) - DISABLED
 	{
+		// Public endpoints - anonymous can view departments
 		departments.GET("", departmentHandler.List)
 		departments.GET("/:id", departmentHandler.GetByID)
 		departments.GET("/:id/status-history", eventHandler.GetDepartmentStatusHistory)
-		departments.POST("", departmentHandler.Create)                                   // middleware.RequireAdmin() - DISABLED
-		departments.PUT("/:id", departmentHandler.Update)                                // middleware.RequireAdmin() - DISABLED
-		departments.DELETE("/:id", departmentHandler.Delete)                             // middleware.RequireAdmin() - DISABLED
-		departments.POST("/:id/members", departmentHandler.AddMember)                    // middleware.RequireDeptHead() - DISABLED
-		departments.PUT("/:id/members/:volunteerId", departmentHandler.UpdateMemberType) // middleware.RequireDeptHead() - DISABLED
-		departments.DELETE("/:id/members/:volunteerId", departmentHandler.RemoveMember)  // middleware.RequireDeptHead() - DISABLED
+
+		// Admin-only endpoints
+		departments.POST("", middleware.RequireAuth(), middleware.RequireAdmin(), departmentHandler.Create)
+		departments.PUT("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), departmentHandler.Update)
+		departments.DELETE("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), departmentHandler.Delete)
+
+		// Department head can manage their own department members
+		departments.POST("/:id/members", middleware.RequireAuth(), middleware.ValidateIsDepartmentHead(db), departmentHandler.AddMember)
+		departments.PUT("/:id/members/:volunteerId", middleware.RequireAuth(), middleware.ValidateIsDepartmentHead(db), departmentHandler.UpdateMemberType)
+		departments.DELETE("/:id/members/:volunteerId", middleware.RequireAuth(), middleware.ValidateIsDepartmentHead(db), departmentHandler.RemoveMember)
 	}
 
-	// Protected routes - Event routes (AUTH DISABLED FOR TESTING)
+	// Event routes - Public GET, Admin CUD, DeptHead volunteer management
 	events := r.Group("/api/events")
-	// events.Use(middleware.RequireAuth()) - DISABLED
 	{
+		// Public endpoints - anonymous can view events
 		events.GET("", eventHandler.List)
 		events.GET("/:id", eventHandler.GetByID)
-		events.POST("", eventHandler.Create)       // middleware.RequireAdmin() - DISABLED
-		events.PUT("/:id", eventHandler.Update)    // middleware.RequireAdmin() - DISABLED
-		events.DELETE("/:id", eventHandler.Delete) // middleware.RequireAdmin() - DISABLED
-		// statust stuff
-		events.POST("/:id/status", eventHandler.AddVolunteerStatus)                      // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId", eventHandler.UpdateVolunteerStatus)       // middleware.RequireDeptHead() - DISABLED
-		events.DELETE("/:id/status/:volunteerId", eventHandler.RemoveVolunteerFromEvent) // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId/TimeIn", eventHandler.TimeInVolunteer)      // middleware.RequireDeptHead() - DISABLED
-		events.PUT("/:id/status/:volunteerId/TimeOut", eventHandler.TimeOutVolunteer)    // middleware.RequireDeptHead() - DISABLED
-		// department stuff
-		events.PUT("/:id/AddDepartment", eventHandler.AddDepartmentToEvent)                     // middleware.RequireDeptHead() - DISABLED
-		events.DELETE("/:id/departments/:departmentId", eventHandler.RemoveDepartmentFromEvent) // middleware.RequireDeptHead() - DISABLED
+
+		// Admin-only endpoints
+		events.POST("", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.Create)
+		events.PUT("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.Update)
+		events.DELETE("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.Delete)
+
+		// Department head can manage volunteers from their department
+		events.POST("/:id/status", middleware.RequireAuth(), eventHandler.AddVolunteerStatus)
+		events.PUT("/:id/status/:volunteerId", middleware.RequireAuth(), middleware.ValidateDepartmentOwnership(db), eventHandler.UpdateVolunteerStatus)
+		events.DELETE("/:id/status/:volunteerId", middleware.RequireAuth(), middleware.ValidateDepartmentOwnership(db), eventHandler.RemoveVolunteerFromEvent)
+		events.PUT("/:id/status/:volunteerId/TimeIn", middleware.RequireAuth(), middleware.ValidateDepartmentOwnership(db), eventHandler.TimeInVolunteer)
+		events.PUT("/:id/status/:volunteerId/TimeOut", middleware.RequireAuth(), middleware.ValidateDepartmentOwnership(db), eventHandler.TimeOutVolunteer)
+
+		// Admin-only department management in events
+		events.PUT("/:id/AddDepartment", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.AddDepartmentToEvent)
+		events.DELETE("/:id/departments/:departmentId", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.RemoveDepartmentFromEvent)
 	}
 
-	// Auth User routes (Admin only) (AUTH DISABLED FOR TESTING)
+	// Auth User routes (Admin only)
 	authUsers := r.Group("/api/auth-users")
-	// authUsers.Use(middleware.RequireAuth()) - DISABLED
-	// authUsers.Use(middleware.RequireAdmin()) - DISABLED
+	authUsers.Use(middleware.RequireAuth())
+	authUsers.Use(middleware.RequireAdmin())
 	{
 		authUsers.GET("", authUserHandler.List)
 		authUsers.GET("/:id", authUserHandler.GetByID)

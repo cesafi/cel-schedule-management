@@ -21,11 +21,11 @@ export const AdminPage: React.FC = () => {
         volunteerId: values.volunteerId,
         accessLevel: values.accessLevel,
       };
-      await authApi.mockLogin({ username: values.username, password: values.password }); // Mock until backend ready
-      message.success('User created successfully (Mock - Backend needed)');
+      await authApi.createUser(data);
+      message.success('User created successfully');
       userForm.resetFields();
-    } catch (error) {
-      message.error('Failed to create user');
+    } catch (error: any) {
+      message.error(error.response?.data?.error || 'Failed to create user');
     } finally {
       setLoading(false);
     }
@@ -95,13 +95,6 @@ export const AdminPage: React.FC = () => {
                 </Button>
               </Form.Item>
             </Form>
-
-            <Divider />
-            
-            <Paragraph type="secondary">
-              <strong>Note:</strong> User creation endpoint not yet implemented in backend. 
-              This is using mock authentication for development.
-            </Paragraph>
           </Card>
         </TabPane>
 

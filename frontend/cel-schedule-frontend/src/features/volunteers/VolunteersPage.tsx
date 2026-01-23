@@ -106,24 +106,28 @@ export const VolunteersPage: React.FC = () => {
           >
             View
           </Button>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            Edit
-          </Button>
-          <Popconfirm
-            title="Delete volunteer"
-            description="Are you sure you want to delete this volunteer?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              Delete
-            </Button>
-          </Popconfirm>
+          {isAdmin && (
+            <>
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+              >
+                Edit
+              </Button>
+              <Popconfirm
+                title="Delete volunteer"
+                description="Are you sure you want to delete this volunteer?"
+                onConfirm={() => handleDelete(record.id)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button type="link" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ),
     },
@@ -133,9 +137,11 @@ export const VolunteersPage: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={2}>Volunteers</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Add Volunteer
-        </Button>
+        {isAdmin && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Add Volunteer
+          </Button>
+        )}
       </div>
 
       <Table

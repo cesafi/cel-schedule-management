@@ -94,6 +94,40 @@ func (r *departmentRepo) ListDepartments(ctx context.Context) ([]*models.Departm
 	return departments, nil
 }
 
+// GetUserDepartments retrieves all departments where the volunteer is a HEAD
+func (r *departmentRepo) GetUserDepartments(ctx context.Context, volunteerID string) ([]*models.DepartmentModel, error) {
+	iter := r.firestore.Collection(departmentsCollection).Documents(ctx)
+	defer iter.Stop()
+
+	var userDepartments []*models.DepartmentModel
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate departments: %v", err)
+		}
+
+		var dept models.DepartmentModel
+		if err := doc.DataTo(&dept); err != nil {
+			return nil, fmt.Errorf("failed to parse department data: %v", err)
+		}
+
+		dept.ID = doc.Ref.ID
+
+		// Check if volunteer is a HEAD in this department
+		for _, member := range dept.VolunteerMembers {
+			if member.VolunteerID == volunteerID && member.MembershipType == sub_model.HEAD {
+				userDepartments = append(userDepartments, &dept)
+				break
+			}
+		}
+	}
+
+	return userDepartments, nil
+}
+
 // AddMemberToDepartment links a member to a department
 func (r *departmentRepo) AddMemberToDepartment(ctx context.Context, departmentID string, memberInfo *sub_model.MembershipInfo) error {
 	// Get the department first

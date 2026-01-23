@@ -32,6 +32,8 @@ type DepartmentRepository interface {
 	DeleteDepartment(ctx context.Context, id string) error
 	// Gives a summarized list of all the deaprtments
 	ListDepartments(ctx context.Context) ([]*models.DepartmentModel, error)
+	// Gets all departments where the volunteer is a HEAD
+	GetUserDepartments(ctx context.Context, volunteerID string) ([]*models.DepartmentModel, error)
 	// Links a member to a Department
 	AddMemberToDepartment(ctx context.Context, departmentID string, memberInfo *sub_model.MembershipInfo) error
 	// Updates the Membership Type of the member

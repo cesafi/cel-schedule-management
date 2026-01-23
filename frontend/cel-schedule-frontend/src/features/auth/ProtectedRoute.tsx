@@ -13,10 +13,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requireRole 
 }) => {
-  // AUTH DISABLED FOR TESTING - Just render children without checks
-  return <>{children}</>;
-  
-  /* ORIGINAL AUTH CODE - COMMENTED OUT FOR TESTING
   const { isAuthenticated, isLoading, hasRole } = useAuth();
 
   if (isLoading) {
@@ -41,5 +37,4 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   return <>{children}</>;
-  */
 };

@@ -121,9 +121,7 @@ export const DepartmentsPage: React.FC = () => {
           >
             View
           </Button>
-          {
-          // isAdmin && 
-          (
+          {isAdmin && (
             <Popconfirm
               title="Delete department"
               description="Are you sure you want to delete this department?"
@@ -145,9 +143,11 @@ export const DepartmentsPage: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={2}>Departments</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Add Department
-        </Button>
+        {isAdmin && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Add Department
+          </Button>
+        )}
       </div>
 
       <Table

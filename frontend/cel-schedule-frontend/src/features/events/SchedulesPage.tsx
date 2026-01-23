@@ -137,9 +137,7 @@ export const SchedulesPage: React.FC = () => {
           >
             View
           </Button>
-          {
-          // isAdmin && 
-          (
+          {isAdmin && (
             <>
               <Button
                 type="link"
@@ -172,9 +170,11 @@ export const SchedulesPage: React.FC = () => {
         <Title level={2}>
           <CalendarOutlined /> Event Schedules
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Create Event
-        </Button>
+        {isAdmin && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Create Event
+          </Button>
+        )}
       </div>
 
       <Table
