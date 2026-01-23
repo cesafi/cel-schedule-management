@@ -9,6 +9,7 @@ import (
 	"sheduling-server/middleware"
 	"sheduling-server/repository"
 	"sheduling-server/repository/firebase"
+	"sheduling-server/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,9 @@ func main() {
 		log.Println("Yeah no env, fuck y'all")
 		return
 	}
+
+	// Initialize Google OAuth configuration
+	utils.InitGoogleOAuth()
 
 	// Initialize database
 	ctx := context.Background()
@@ -51,6 +55,7 @@ func main() {
 	departmentHandler := handlers.NewDepartmentHandler(db)
 	eventHandler := handlers.NewEventHandler(db)
 	authUserHandler := handlers.NewAuthUserHandler(db)
+	oauthHandler := handlers.NewOAuthHandler(db)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -76,6 +81,14 @@ func main() {
 	{
 		auth.POST("/login", authUserHandler.Login)
 		auth.GET("/me", middleware.RequireAuth(), authUserHandler.GetCurrentUser)
+	}
+
+	// OAuth routes
+	oauth := r.Group("/api/oauth")
+	{
+		oauth.GET("/google/login", oauthHandler.GetGoogleLoginURL)                           // Get Google login URL
+		oauth.POST("/google/callback", oauthHandler.GoogleCallback)                          // Handle Google callback
+		oauth.POST("/google/link", middleware.RequireAuth(), oauthHandler.LinkGoogleAccount) // Link Google to existing account
 	}
 
 	// Volunteer routes - Public GET, Admin-only CUD

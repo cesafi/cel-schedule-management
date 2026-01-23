@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, LoginPage, ProtectedRoute } from '../features/auth';
+import { AuthProvider, LoginPage, ProtectedRoute, OAuthCallback, AccountSettings } from '../features/auth';
 import { MainLayout } from '../layouts';
 import { HomePage } from './HomePage';
 import { SchedulesPage, EventDetailPage } from '../features/events';
@@ -14,8 +14,9 @@ export const AppRouter: React.FC = () => {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public route */}
+          {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
 
           {/* Public routes with MainLayout - Anonymous users can view */}
           <Route element={<MainLayout />}>
@@ -26,6 +27,16 @@ export const AppRouter: React.FC = () => {
             <Route path="/departments/:id" element={<DepartmentDetailPage />} />
             <Route path="/volunteers" element={<VolunteersPage />} />
             <Route path="/volunteers/:id" element={<VolunteerDetailPage />} />
+
+            {/* Account settings - Requires authentication */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <AccountSettings />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin only route - Requires authentication and admin role */}
             <Route

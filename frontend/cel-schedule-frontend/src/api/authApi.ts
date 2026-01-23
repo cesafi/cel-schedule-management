@@ -24,6 +24,42 @@ export const authApi = {
     return response.data;
   },
 
+  // Get Google OAuth login URL
+  async getGoogleLoginURL(): Promise<{ url: string; state: string }> {
+    const response = await apiClient.get('/oauth/google/login');
+    return response.data;
+  },
+
+  // Handle Google OAuth callback
+  async googleCallback(code: string, state: string): Promise<LoginResponse> {
+    const response = await apiClient.post('/oauth/google/callback', { code, state });
+    return response.data;
+  },
+
+  // Link Google account to existing user
+  async linkGoogleAccount(code: string): Promise<{ message: string; email: string }> {
+    const response = await apiClient.post('/oauth/google/link', { code });
+    return response.data;
+  },
+
+  // Get Google OAuth login URL
+  async getGoogleLoginURL(): Promise<{ url: string; state: string }> {
+    const response = await apiClient.get('/oauth/google/login');
+    return response.data;
+  },
+
+  // Handle Google OAuth callback
+  async googleCallback(code: string, state: string): Promise<LoginResponse> {
+    const response = await apiClient.post('/oauth/google/callback', { code, state });
+    return response.data;
+  },
+
+  // Link Google account to existing user
+  async linkGoogleAccount(code: string): Promise<{ message: string; email: string }> {
+    const response = await apiClient.post('/oauth/google/link', { code });
+    return response.data;
+  },
+
   // Mock login for development (remove when backend is ready)
   async mockLogin(credentials: LoginDTO): Promise<LoginResponse> {
     // Simulate API delay

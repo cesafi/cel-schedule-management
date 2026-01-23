@@ -17,6 +17,8 @@ interface AuthContextType {
   isDeptHead: boolean;
   isHeadOfDepartment: (departmentId: string) => boolean;
   canManageVolunteer: (volunteerId: string, allDepartments: Department[]) => boolean;
+  setUser: (user: AuthUser | null) => void;
+  setToken: (token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -103,6 +105,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     window.location.href = '/login';
   };
 
+  const setTokenHelper = (token: string) => {
+    storage.setToken(token);
+  };
+
+  const setUserHelper = (newUser: AuthUser | null) => {
+    if (newUser) {
+      storage.setUser(newUser);
+    }
+    setUser(newUser);
+  };
+
   const hasRole = (role: AccessLevel): boolean => {
     if (!user) return false;
     return user.accessLevel <= role; // Lower number = higher access
@@ -140,6 +153,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isDeptHead,
         isHeadOfDepartment,
         canManageVolunteer,
+        setUser: setUserHelper,
+        setToken: setTokenHelper,
       }}
     >
       {children}

@@ -40,3 +40,12 @@ export interface LoginResponse {
   accessLevel: AccessLevel;
   expiresAt: string;
 }
+
+export interface OAuthLoginResponse extends LoginResponse {
+  isNewUser: boolean;
+}
+
+export interface GoogleLoginURL {
+  url: string;
+  state: string;
+}

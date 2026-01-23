@@ -62,6 +62,12 @@ export const Header: React.FC = () => {
       onClick: () => navigate(`/volunteers/${user?.volunteerId}`),
     },
     {
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: 'Account Settings',
+      onClick: () => navigate('/settings'),
+    },
+    {
       key: 'logout',
       icon: <LogoutOutlined />,
       label: 'Logout',

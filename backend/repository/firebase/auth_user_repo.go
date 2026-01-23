@@ -74,6 +74,32 @@ func (r *authUserRepo) GetUserByID(ctx context.Context, id string) (*models.Auth
 	return &user, nil
 }
 
+// GetByGoogleEmail retrieves an auth user by their Google email
+func (r *authUserRepo) GetByGoogleEmail(ctx context.Context, email string) (*models.AuthUser, error) {
+	iter := r.firestore.Collection(authUsersCollection).
+		Where("thirdAuth.email", "==", email).
+		Where("thirdAuth.provider", "==", "google").
+		Limit(1).
+		Documents(ctx)
+	defer iter.Stop()
+
+	doc, err := iter.Next()
+	if err == iterator.Done {
+		return nil, nil // Return nil instead of error when not found
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user by Google email: %v", err)
+	}
+
+	var user models.AuthUser
+	if err := doc.DataTo(&user); err != nil {
+		return nil, fmt.Errorf("failed to parse auth user data: %v", err)
+	}
+
+	user.ID = doc.Ref.ID
+	return &user, nil
+}
+
 // UpdateUser updates an existing auth user
 func (r *authUserRepo) UpdateUser(ctx context.Context, user *models.AuthUser) error {
 	_, err := r.firestore.Collection(authUsersCollection).Doc(user.ID).Set(ctx, user)

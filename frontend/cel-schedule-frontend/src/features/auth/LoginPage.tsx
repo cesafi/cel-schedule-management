@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Input, Button, Card, Typography, Alert } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, Typography, Alert, Divider } from 'antd';
+import { UserOutlined, LockOutlined, GoogleOutlined } from '@ant-design/icons';
 import { useAuth } from './AuthContext';
 import { LoginDTO } from '../../types';
+import { authApi } from '../../api';
 
 const { Title } = Typography;
 
@@ -23,6 +24,20 @@ export const LoginPage: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { url } = await authApi.getGoogleLoginURL();
+      // Open Google OAuth in same window
+      window.location.href = url;
+    } catch (err: any) {
+      setError('Failed to initiate Google login');
       setLoading(false);
     }
   };
@@ -92,6 +107,24 @@ export const LoginPage: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
+
+        <Divider>OR</Divider>
+
+        <Button
+          icon={<GoogleOutlined />}
+          size="large"
+          block
+          onClick={handleGoogleLogin}
+          loading={loading}
+          style={{
+            backgroundColor: '#fff',
+            color: '#000',
+            borderColor: '#ddd',
+            fontWeight: 500,
+          }}
+        >
+          Continue with Google
+        </Button>
 
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
