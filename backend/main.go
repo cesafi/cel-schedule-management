@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -68,7 +69,7 @@ func main() {
 	// Add production frontend URL if configured
 	if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
 		allowedOrigins = append(allowedOrigins, frontendURL)
-		log.Printf("Added FRONTEND_URL to allowed origins: %s", frontendURL)
+		fmt.Printf("Added FRONTEND_URL to allowed origins: %s\n", frontendURL)
 	}
 
 	log.Printf("CORS allowed origins: %v", allowedOrigins)
