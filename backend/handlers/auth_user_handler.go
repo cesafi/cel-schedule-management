@@ -210,5 +210,10 @@ func (h *AuthUserHandler) GetCurrentUser(c *gin.Context) {
 		IsDisabled:  user.IsDisabled,
 	}
 
+	// Include ThirdAuth if present
+	if user.ThirdAuth.Provider != "" {
+		output.ThirdAuth = &user.ThirdAuth
+	}
+
 	c.JSON(http.StatusOK, output)
 }

@@ -58,6 +58,11 @@ export const OAuthCallback: React.FC = () => {
           console.log('Calling authApi.linkGoogleAccount...');
           const result = await authApi.linkGoogleAccount(code);
           console.log('Link successful:', result);
+          
+          // Refresh user data to get the updated thirdAuth info
+          const updatedUser = await authApi.getCurrentUser();
+          setUser(updatedUser);
+          
           message.success(`Google account linked: ${result.email}`);
           navigate('/settings', { replace: true });
         } else {

@@ -75,19 +75,44 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	// Check if user already exists with this Google email
+	// First, check if Google is already linked to an account
 	existingUser, err := h.db.AuthUsers().GetByGoogleEmail(context.Background(), googleUser.Email)
 
 	var authUser *models.AuthUser
 	isNewUser := false
 
 	if err != nil || existingUser == nil {
-		// Create new user with Google OAuth
-		isNewUser = true
-		authUser = &models.AuthUser{
-			Username:    googleUser.Email, // Use email as username
-			AccessLevel: models.DEPTHEAD,  // Default to department head
-			ThirdAuth: sub_model.OAuthToken{
+		// Google not linked, check if user exists with this email as username
+		existingUser, err = h.db.AuthUsers().GetByUsername(context.Background(), googleUser.Email)
+
+		if err != nil || existingUser == nil {
+			// Create new user with Google OAuth
+			isNewUser = true
+			authUser = &models.AuthUser{
+				Username:    googleUser.Email, // Use email as username
+				AccessLevel: models.DEPTHEAD,  // Default to department head
+				ThirdAuth: sub_model.OAuthToken{
+					Provider:     sub_model.Google,
+					Email:        googleUser.Email,
+					AccessToken:  token.AccessToken,
+					RefreshToken: token.RefreshToken,
+					TokenType:    token.TokenType,
+					Expiry:       token.Expiry,
+					LinkedAt:     time.Now(),
+				},
+				CreatedAt:   time.Now(),
+				LastUpdated: time.Now(),
+				IsDisabled:  false,
+			}
+
+			err := h.db.AuthUsers().CreateUser(context.Background(), authUser)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user: " + err.Error()})
+				return
+			}
+		} else {
+			// User exists with this email as username, link Google OAuth
+			existingUser.ThirdAuth = sub_model.OAuthToken{
 				Provider:     sub_model.Google,
 				Email:        googleUser.Email,
 				AccessToken:  token.AccessToken,
@@ -95,28 +120,23 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 				TokenType:    token.TokenType,
 				Expiry:       token.Expiry,
 				LinkedAt:     time.Now(),
-			},
-			CreatedAt:   time.Now(),
-			LastUpdated: time.Now(),
-			IsDisabled:  false,
-		}
+			}
+			existingUser.LastUpdated = time.Now()
 
-		err := h.db.AuthUsers().CreateUser(context.Background(), authUser)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user: " + err.Error()})
-			return
+			err = h.db.AuthUsers().UpdateUser(context.Background(), existingUser)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user: " + err.Error()})
+				return
+			}
+			authUser = existingUser
 		}
 	} else {
-		// Update existing user with Google OAuth info
-		existingUser.ThirdAuth = sub_model.OAuthToken{
-			Provider:     sub_model.Google,
-			Email:        googleUser.Email,
-			AccessToken:  token.AccessToken,
-			RefreshToken: token.RefreshToken,
-			TokenType:    token.TokenType,
-			Expiry:       token.Expiry,
-			LinkedAt:     time.Now(),
-		}
+		// Google already linked, just update the token
+		existingUser.ThirdAuth.AccessToken = token.AccessToken
+		existingUser.ThirdAuth.RefreshToken = token.RefreshToken
+		existingUser.ThirdAuth.TokenType = token.TokenType
+		existingUser.ThirdAuth.Expiry = token.Expiry
+		existingUser.ThirdAuth.LinkedAt = time.Now()
 		existingUser.LastUpdated = time.Now()
 
 		err = h.db.AuthUsers().UpdateUser(context.Background(), existingUser)

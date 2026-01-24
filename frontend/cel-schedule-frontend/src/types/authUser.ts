@@ -2,14 +2,24 @@ import { AccessLevel } from './enums';
 
 // Auth User types
 
+export interface OAuthToken {
+  provider: string;
+  email: string;
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiry: string;
+  linkedAt: string;
+}
+
 export interface AuthUser {
   id: string;
   username: string;
   volunteerId: string;
   accessLevel: AccessLevel;
-  thirdPartyAuthToken?: string;
+  thirdAuth?: OAuthToken;
   createdAt: string;
-  updatedAt: string;
+  lastUpdated: string;
   isDisabled: boolean;
 }
 

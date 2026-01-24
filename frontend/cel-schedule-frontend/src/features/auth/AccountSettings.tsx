@@ -70,26 +70,34 @@ export const AccountSettings: React.FC = () => {
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div>
             <Space align="center">
-              <GoogleOutlined style={{ fontSize: 24 }} />
+              <GoogleOutlined style={{ fontSize: 24, color: user.thirdAuth?.provider === 'google' ? '#4285F4' : undefined }} />
               <div>
                 <Text strong>Google Account</Text>
                 <br />
-                <Text type="secondary">
-                  Link your Google account to sign in with Google
-                </Text>
+                {user.thirdAuth?.provider === 'google' ? (
+                  <Text style={{ color: '#52c41a' }}>
+                    Connected: {user.thirdAuth.email}
+                  </Text>
+                ) : (
+                  <Text type="secondary">
+                    Link your Google account to sign in with Google
+                  </Text>
+                )}
               </div>
             </Space>
             
-            <div style={{ marginTop: 10 }}>
-              <Button
-                type="primary"
-                icon={<LinkOutlined />}
-                onClick={handleLinkGoogle}
-                loading={loading}
-              >
-                Link Google Account
-              </Button>
-            </div>
+            {!user.thirdAuth?.provider && (
+              <div style={{ marginTop: 10 }}>
+                <Button
+                  type="primary"
+                  icon={<LinkOutlined />}
+                  onClick={handleLinkGoogle}
+                  loading={loading}
+                >
+                  Link Google Account
+                </Button>
+              </div>
+            )}
           </div>
         </Space>
       </Card>

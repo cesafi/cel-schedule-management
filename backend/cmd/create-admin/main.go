@@ -66,6 +66,7 @@ func main() {
 		db, err = firebase.NewFirebaseDB(
 			ctx,
 			getEnv("FIREBASE_CREDENTIALS_PATH", ""),
+			getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 			getEnv("FIREBASE_PROJECT_ID", ""),
 		)
 		if err != nil {

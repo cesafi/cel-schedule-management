@@ -77,8 +77,8 @@ func (r *authUserRepo) GetUserByID(ctx context.Context, id string) (*models.Auth
 // GetByGoogleEmail retrieves an auth user by their Google email
 func (r *authUserRepo) GetByGoogleEmail(ctx context.Context, email string) (*models.AuthUser, error) {
 	iter := r.firestore.Collection(authUsersCollection).
-		Where("thirdAuth.email", "==", email).
-		Where("thirdAuth.provider", "==", "google").
+		Where("ThirdAuth.Email", "==", email).
+		Where("ThirdAuth.Provider", "==", "google").
 		Limit(1).
 		Documents(ctx)
 	defer iter.Stop()

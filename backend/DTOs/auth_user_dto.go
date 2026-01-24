@@ -1,6 +1,9 @@
 package dtos
 
-import "time"
+import (
+	sub_model "sheduling-server/models/sub_models"
+	"time"
+)
 
 // DTOS FOR AUTH USER THINGS
 
@@ -21,13 +24,14 @@ type Update_AuthUser_Input struct {
 
 // sends detailed information about the AuthUser (NEVER includes password)
 type GetByID_AuthUser_Output struct {
-	ID          string    `json:"id"`
-	VolunteerID string    `json:"volunteerId"`
-	Username    string    `json:"username"`
-	AccessLevel int       `json:"accessLevel"`
-	CreatedAt   time.Time `json:"createdAt"`
-	LastUpdated time.Time `json:"lastUpdated"`
-	IsDisabled  bool      `json:"isDisabled"`
+	ID          string                `json:"id"`
+	VolunteerID string                `json:"volunteerId"`
+	Username    string                `json:"username"`
+	AccessLevel int                   `json:"accessLevel"`
+	ThirdAuth   *sub_model.OAuthToken `json:"thirdAuth,omitempty"`
+	CreatedAt   time.Time             `json:"createdAt"`
+	LastUpdated time.Time             `json:"lastUpdated"`
+	IsDisabled  bool                  `json:"isDisabled"`
 }
 
 // sanitized list of all users (no passwords, minimal info)
