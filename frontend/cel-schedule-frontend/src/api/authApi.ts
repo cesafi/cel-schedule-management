@@ -42,24 +42,6 @@ export const authApi = {
     return response.data;
   },
 
-  // Get Google OAuth login URL
-  async getGoogleLoginURL(): Promise<{ url: string; state: string }> {
-    const response = await apiClient.get('/oauth/google/login');
-    return response.data;
-  },
-
-  // Handle Google OAuth callback
-  async googleCallback(code: string, state: string): Promise<LoginResponse> {
-    const response = await apiClient.post('/oauth/google/callback', { code, state });
-    return response.data;
-  },
-
-  // Link Google account to existing user
-  async linkGoogleAccount(code: string): Promise<{ message: string; email: string }> {
-    const response = await apiClient.post('/oauth/google/link', { code });
-    return response.data;
-  },
-
   // Mock login for development (remove when backend is ready)
   async mockLogin(credentials: LoginDTO): Promise<LoginResponse> {
     // Simulate API delay
@@ -68,15 +50,10 @@ export const authApi = {
     // Mock successful login
     return {
       token: 'mock-jwt-token-' + Date.now(),
-      user: {
-        id: 'mock-user-1',
-        username: credentials.username,
-        volunteerId: 'volunteer-1',
-        accessLevel: 1, // Admin for testing
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isDisabled: false,
-      },
+      userId: 'mock-user-1',
+      username: credentials.username,
+      accessLevel: 1, // Admin for testing
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours from now
     };
   },
 };
