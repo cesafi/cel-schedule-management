@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           volunteerId: '', // Will need to be fetched later
           accessLevel: response.accessLevel,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
           isDisabled: false,
         };
         storage.setUser(user);
