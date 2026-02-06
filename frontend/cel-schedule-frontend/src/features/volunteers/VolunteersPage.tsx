@@ -23,7 +23,8 @@ export const VolunteersPage: React.FC = () => {
     try {
       const data = await volunteersApi.getAll();
       setVolunteers(data);
-    } catch (error: any) {
+    } catch (err) {
+      console.error('Failed to load volunteers:', err);
       message.error('Failed to load volunteers');
     } finally {
       setLoading(false);
@@ -49,7 +50,8 @@ export const VolunteersPage: React.FC = () => {
       await volunteersApi.delete(id);
       message.success('Volunteer deleted successfully');
       fetchVolunteers();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to delete volunteer:', err);
       message.error('Failed to delete volunteer');
     }
   };
@@ -65,9 +67,10 @@ export const VolunteersPage: React.FC = () => {
       }
       setModalOpen(false);
       fetchVolunteers();
-    } catch (error) {
+    } catch (err) {
+      console.error(`Failed to ${editingVolunteer ? 'update' : 'create'} volunteer:`, err);
       message.error(`Failed to ${editingVolunteer ? 'update' : 'create'} volunteer`);
-      throw error;
+      throw err;
     }
   };
 
@@ -97,7 +100,7 @@ export const VolunteersPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: Volunteer) => (
+      render: (_: unknown, record: Volunteer) => (
         <Space size="small">
           <Button
             type="link"

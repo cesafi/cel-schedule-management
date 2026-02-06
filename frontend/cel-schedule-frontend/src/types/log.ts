@@ -6,5 +6,5 @@ export interface SystemLog {
   id: string;
   logType: LogType;
   timeStamp: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }

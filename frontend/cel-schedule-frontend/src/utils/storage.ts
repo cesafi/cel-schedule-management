@@ -1,4 +1,5 @@
 // Local storage helpers for token management
+import { AuthUser } from '../types/authUser';
 
 const TOKEN_KEY = 'cel_auth_token';
 const USER_KEY = 'cel_auth_user';
@@ -16,7 +17,7 @@ export const storage = {
     localStorage.removeItem(TOKEN_KEY);
   },
 
-  getUser(): any | null {
+  getUser(): AuthUser | null {
     const user = localStorage.getItem(USER_KEY);
     if (!user) return null;
     
@@ -30,7 +31,7 @@ export const storage = {
     }
   },
 
-  setUser(user: any): void {
+  setUser(user: AuthUser): void {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
 

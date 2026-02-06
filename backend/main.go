@@ -90,6 +90,23 @@ func main() {
 		})
 	})
 
+	// Readiness check - verifies Firebase connection is ready
+	r.GET("/health/ready", func(c *gin.Context) {
+		// Check if database is initialized
+		if db == nil {
+			c.JSON(503, gin.H{
+				"status":  "initializing",
+				"message": "Database is not ready yet",
+			})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"status":  "ready",
+			"message": "Service is ready to accept requests",
+		})
+	})
+
 	// Public auth routes
 	auth := r.Group("/api/auth")
 	{

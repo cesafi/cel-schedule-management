@@ -24,7 +24,8 @@ export const SchedulesPage: React.FC = () => {
     try {
       const data = await eventsApi.getAll();
       setEvents(data);
-    } catch (error: any) {
+    } catch (err) {
+      console.error('Failed to load events:', err);
       message.error('Failed to load events');
     } finally {
       setLoading(false);
@@ -35,7 +36,8 @@ export const SchedulesPage: React.FC = () => {
     try {
       const data = await departmentsApi.getAll();
       setDepartments(data.filter(d => !d.isDisabled));
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to load departments:', err);
       message.error('Failed to load departments');
     }
   };
@@ -60,7 +62,8 @@ export const SchedulesPage: React.FC = () => {
       await eventsApi.delete(id);
       message.success('Event deleted successfully');
       fetchEvents();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to delete event:', err);
       message.error('Failed to delete event');
     }
   };
@@ -76,9 +79,10 @@ export const SchedulesPage: React.FC = () => {
       }
       setModalOpen(false);
       fetchEvents();
-    } catch (error) {
+    } catch (err) {
+      console.error(`Failed to ${editingEvent ? 'update' : 'create'} event:`, err);
       message.error(`Failed to ${editingEvent ? 'update' : 'create'} event`);
-      throw error;
+      throw err;
     }
   };
 
@@ -112,7 +116,7 @@ export const SchedulesPage: React.FC = () => {
     {
       title: 'Volunteers',
       key: 'volunteers',
-      render: (_: any, record: EventSchedule) => 
+      render: (_: unknown, record: EventSchedule) => 
         (record.scheduledVolunteers?.length || 0) + (record.voluntaryVolunteers?.length || 0),
     },
     {
@@ -128,7 +132,7 @@ export const SchedulesPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: EventSchedule) => (
+      render: (_: unknown, record: EventSchedule) => (
         <Space size="small">
           <Button
             type="link"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Card, Tabs, Form, Input, Button, Select, Space, message, Divider } from 'antd';
+import { Typography, Card, Tabs, Form, Input, Button, Select, message } from 'antd';
 import { UserAddOutlined, TeamOutlined } from '@ant-design/icons';
 import { authApi, volunteersApi } from '../../api';
 import { AuthUserCreateDTO, VolunteerCreateDTO, AccessLevel } from '../../types';
@@ -12,7 +12,7 @@ export const AdminPage: React.FC = () => {
   const [userForm] = Form.useForm();
   const [volunteerForm] = Form.useForm();
 
-  const handleCreateUser = async (values: any) => {
+  const handleCreateUser = async (values: AuthUserCreateDTO) => {
     setLoading(true);
     try {
       const data: AuthUserCreateDTO = {
@@ -24,7 +24,8 @@ export const AdminPage: React.FC = () => {
       await authApi.createUser(data);
       message.success('User created successfully');
       userForm.resetFields();
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as { response?: { data?: { error?: string } } };
       message.error(error.response?.data?.error || 'Failed to create user');
     } finally {
       setLoading(false);
@@ -37,7 +38,8 @@ export const AdminPage: React.FC = () => {
       await volunteersApi.create(values);
       message.success('Volunteer created successfully');
       volunteerForm.resetFields();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to create volunteer:', err);
       message.error('Failed to create volunteer');
     } finally {
       setLoading(false);

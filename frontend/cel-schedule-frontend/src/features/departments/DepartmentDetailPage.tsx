@@ -13,7 +13,7 @@ const { Title } = Typography;
 export const DepartmentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAdmin, isDeptHead, user, isHeadOfDepartment } = useAuth();
+  const { isAdmin, isHeadOfDepartment } = useAuth();
   const [department, setDepartment] = useState<Department | null>(null);
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
@@ -33,7 +33,8 @@ export const DepartmentDetailPage: React.FC = () => {
       setDepartment(deptData);
       setHistory(historyData);
       setVolunteers(volunteersData.filter(v => !v.isDisabled));
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to load department data:', err);
       message.error('Failed to load department data');
     } finally {
       setLoading(false);
@@ -42,7 +43,8 @@ export const DepartmentDetailPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // fetchData is stable as it doesn't use any state/props except id
 
   const handleAddMember = async (values: AddMemberDTO) => {
     if (!id) return;
@@ -52,7 +54,8 @@ export const DepartmentDetailPage: React.FC = () => {
       message.success('Member added successfully');
       setModalOpen(false);
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to add member:', err);
       message.error('Failed to add member');
       throw error;
     }
@@ -65,7 +68,8 @@ export const DepartmentDetailPage: React.FC = () => {
       await departmentsApi.removeMember(id, volunteerId);
       message.success('Member removed successfully');
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to remove member:', err);
       message.error('Failed to remove member');
     }
   };
@@ -138,7 +142,7 @@ export const DepartmentDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: any) => {
+      render: (_: unknown, record: { volunteerID: string }) => {
         if (!canManage) return null;
         return (
           <Popconfirm
@@ -172,7 +176,7 @@ export const DepartmentDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: StatusHistoryItem) => (
+      render: (_: unknown, record: StatusHistoryItem) => (
         <Button type="link" onClick={() => navigate(`/events/${record.eventId}`)}>
           View Event
         </Button>

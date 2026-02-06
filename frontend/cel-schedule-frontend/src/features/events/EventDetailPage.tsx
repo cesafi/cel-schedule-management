@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Modal, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, CheckCircleOutlined, ClockCircleOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { eventsApi, volunteersApi, departmentsApi } from '../../api';
-import { EventSchedule, Volunteer, Department, AddStatusDTO, UpdateStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
+import { EventSchedule, Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
 import { format } from 'date-fns';
 import { useAuth } from '../auth';
@@ -43,7 +43,8 @@ export const EventDetailPage: React.FC = () => {
       setEvent(eventData);
       setVolunteers(volunteersData);
       setDepartments(departmentsData);
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to load event data:', err);
       message.error('Failed to load event data');
     } finally {
       setLoading(false);
@@ -52,9 +53,10 @@ export const EventDetailPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // fetchData is stable
 
-  const handleTimeIn = async (volunteerId: string, values: any) => {
+  const handleTimeIn = async (volunteerId: string, values: { timeIn?: string; attendanceType?: string }) => {
     if (!id) return;
     
     try {
@@ -67,12 +69,13 @@ export const EventDetailPage: React.FC = () => {
       setEditingTimeIn(null);
       timeInForm.resetFields();
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to check in volunteer:', err);
       message.error('Failed to check in volunteer');
     }
   };
 
-  const handleTimeOut = async (volunteerId: string, values: any) => {
+  const handleTimeOut = async (volunteerId: string, values: { timeOut?: string }) => {
     if (!id) return;
     
     try {
@@ -85,7 +88,8 @@ export const EventDetailPage: React.FC = () => {
       setEditingTimeOut(null);
       timeOutForm.resetFields();
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to check out volunteer:', err);
       message.error('Failed to check out volunteer');
     }
   };
@@ -98,7 +102,8 @@ export const EventDetailPage: React.FC = () => {
       message.success('Departments added successfully');
       setAddDeptModalOpen(false);
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to add departments:', err);
       message.error('Failed to add departments');
     }
   };
@@ -110,7 +115,8 @@ export const EventDetailPage: React.FC = () => {
       await eventsApi.removeDepartmentFromEvent(id, departmentId);
       message.success('Department removed successfully');
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to remove department:', err);
       message.error('Failed to remove department');
     }
   };
@@ -122,11 +128,14 @@ export const EventDetailPage: React.FC = () => {
       await eventsApi.removeVolunteerFromEvent(id, volunteerId);
       message.success('Volunteer removed from event successfully');
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to remove volunteer:', err);
       message.error('Failed to remove volunteer');
     }
   };
 
+  // Unused for now - TODO: implement volunteer addition feature
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleAddVolunteers = async (volunteerIds: string[]) => {
     if (!id || !event) return;
     
@@ -139,9 +148,10 @@ export const EventDetailPage: React.FC = () => {
       message.success('Volunteers added successfully');
       setAddVolunteerModalOpen(false);
       fetchData();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to add volunteers:', err);
       message.error('Failed to add volunteers');
-      throw error;
+      throw err;
     }
   };
 
@@ -163,12 +173,15 @@ export const EventDetailPage: React.FC = () => {
     );
   };
 
+  // Type for status records in tables
+  type StatusRecord = { volunteerID: string; timeIn?: string; timeOut?: string; attendanceType?: string; timeOutType?: string };
+
   const attendanceColumns = [
     {
       title: 'Volunteer',
       dataIndex: 'volunteerID',
       key: 'volunteerID',
-      sorter: (a: any, b: any) => {
+      sorter: (a: StatusRecord, b: StatusRecord) => {
         const volA = volunteers.find(v => v.id === a.volunteerID);
         const volB = volunteers.find(v => v.id === b.volunteerID);
         return (volA?.name || '').localeCompare(volB?.name || '');
@@ -185,14 +198,14 @@ export const EventDetailPage: React.FC = () => {
     {
       title: 'Department',
       key: 'department',
-      sorter: (a: any, b: any) => {
+      sorter: (a: StatusRecord, b: StatusRecord) => {
         const deptsA = getVolunteerDepartments(a.volunteerID);
         const deptsB = getVolunteerDepartments(b.volunteerID);
         const nameA = deptsA[0]?.departmentName || 'zzz';
         const nameB = deptsB[0]?.departmentName || 'zzz';
         return nameA.localeCompare(nameB);
       },
-      render: (_: any, record: any) => {
+      render: (_: unknown, record: StatusRecord) => {
         const volunteerDepts = getVolunteerDepartments(record.volunteerID);
         return volunteerDepts.length > 0 ? (
           <Space wrap>
@@ -211,13 +224,13 @@ export const EventDetailPage: React.FC = () => {
       title: 'Time In',
       dataIndex: 'timeIn',
       key: 'timeIn',
-      sorter: (a: any, b: any) => {
+      sorter: (a: StatusRecord, b: StatusRecord) => {
         if (!a.timeIn && !b.timeIn) return 0;
         if (!a.timeIn) return 1;
         if (!b.timeIn) return -1;
         return new Date(a.timeIn).getTime() - new Date(b.timeIn).getTime();
       },
-      render: (time: string, record: any) => {
+      render: (time: string, record: StatusRecord) => {
         if (!record.attendanceType && editingTimeIn === record.volunteerID) {
           return (
             <Form
@@ -251,7 +264,7 @@ export const EventDetailPage: React.FC = () => {
         }
         
         if (!record.attendanceType) {
-          const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+          const canManage = isAdmin || canManageVolunteer(record.volunteerID);
           if (!canManage) {
             return <span>-</span>;
           }
@@ -265,7 +278,7 @@ export const EventDetailPage: React.FC = () => {
           );
         }
 
-        const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+        const canManage = isAdmin || canManageVolunteer(record.volunteerID);
         return (
           <Space>
             <Tag color={record.attendanceType === AttendanceType.PRESENT ? 'green' : record.attendanceType === AttendanceType.LATE ? 'orange' : 'blue'}>
@@ -295,13 +308,13 @@ export const EventDetailPage: React.FC = () => {
       title: 'Time Out',
       dataIndex: 'timeOut',
       key: 'timeOut',
-      sorter: (a: any, b: any) => {
+      sorter: (a: StatusRecord, b: StatusRecord) => {
         if (!a.timeOut && !b.timeOut) return 0;
         if (!a.timeOut) return 1;
         if (!b.timeOut) return -1;
         return new Date(a.timeOut).getTime() - new Date(b.timeOut).getTime();
       },
-      render: (time: string, record: any) => {
+      render: (time: string, record: StatusRecord) => {
         if (!record.timeOutType && editingTimeOut === record.volunteerID) {
           return (
             <Form
@@ -336,7 +349,7 @@ export const EventDetailPage: React.FC = () => {
         }
         
         if (!record.timeOutType && record.attendanceType) {
-          const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+          const canManage = isAdmin || canManageVolunteer(record.volunteerID);
           if (!canManage) {
             return <span>-</span>;
           }
@@ -351,7 +364,7 @@ export const EventDetailPage: React.FC = () => {
         }
 
         if (record.timeOutType) {
-          const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+          const canManage = isAdmin || canManageVolunteer(record.volunteerID);
           return (
             <Space>
               <Tag color={record.timeOutType === TimeOutType.ONTIME ? 'green' : record.timeOutType === TimeOutType.EARYLEAVE ? 'orange' : 'red'}>
@@ -383,8 +396,8 @@ export const EventDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: any) => {
-        const canManage = isAdmin || canManageVolunteer(record.volunteerID, departments);
+      render: (_: unknown, record: StatusRecord) => {
+        const canManage = isAdmin || canManageVolunteer(record.volunteerID);
         if (!canManage) return null;
         return (
           <Popconfirm
@@ -408,7 +421,7 @@ export const EventDetailPage: React.FC = () => {
       title: 'Department',
       dataIndex: 'id',
       key: 'id',
-      render: (_: any, deptId: string) => {
+      render: (_: unknown, deptId: string) => {
         const dept = departments.find(d => d.id === deptId);
         console.log("Debug Dept Info: ", deptId, dept);
         return dept ? (
@@ -421,7 +434,7 @@ export const EventDetailPage: React.FC = () => {
     {
       title: 'Members',
       key: 'members',
-      render: (_: any, deptId: string) => {
+      render: (_: unknown, deptId: string) => {
         const dept = departments.find(d => d.id === deptId);
         console.log("Debug Dept Members: ", deptId, dept);
         return dept?.volunteerMembers?.length || 0;
@@ -430,7 +443,7 @@ export const EventDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, deptId: string) => {
+      render: (_: unknown, deptId: string) => {
         if (!isAdmin) return null;
         return (
           <Popconfirm
@@ -449,24 +462,28 @@ export const EventDetailPage: React.FC = () => {
     },
   ];
 
-  const checkedInVolunteerIds = event.statuses?.map(s => s.volunteerID) || [];
-  const availableVolunteers = volunteers.filter(
-    v => !v.isDisabled && 
-         !checkedInVolunteerIds.includes(v.id) &&
-         ((event.scheduledVolunteers || []).includes(v.id) || (event.voluntaryVolunteers || []).includes(v.id))
-  );
+  // Unused for now - kept for future feature
+  // const checkedInVolunteerIds = event.statuses?.map(s => s.volunteerID) || [];
+  // Unused for now - TODO: implement volunteer selection feature
+  // const availableVolunteers = volunteers.filter(
+  //   v => !v.isDisabled && 
+  //        !checkedInVolunteerIds.includes(v.id) &&
+  //        ((event.scheduledVolunteers || []).includes(v.id) || (event.voluntaryVolunteers || []).includes(v.id))
+  // );
 
   const availableDepartments = departments.filter(
     d => !d.isDisabled && !(event.assignedGroups || []).includes(d.id)
   );
 
-  const unscheduledVolunteers = volunteers.filter(
-    v => !v.isDisabled && !(event.scheduledVolunteers || []).includes(v.id)
-  );
+  // Unused for now - TODO: implement volunteer scheduling feature
+  // const unscheduledVolunteers = volunteers.filter(
+  //   v => !v.isDisabled && !(event.scheduledVolunteers || []).includes(v.id)
+  // );
 
-  const volunteersNotInAttendance = (event.scheduledVolunteers || []).filter(
-    vid => !(event.statuses || []).some(s => s.volunteerID === vid)
-  );
+  // Unused for now - TODO: implement attendance tracking feature
+  // const volunteersNotInAttendance = (event.scheduledVolunteers || []).filter(
+  //   vid => !(event.statuses || []).some(s => s.volunteerID === vid)
+  // );
 
   // Filter attendance data
   const filteredAttendance = (event.statuses || []).filter((record) => {
@@ -495,20 +512,21 @@ export const EventDetailPage: React.FC = () => {
     return true;
   });
 
-  const scheduledVolunteerColumns = [
-    {
-      title: 'Volunteer',
-      key: 'volunteer',
-      render: (volunteerId: string) => {
-        const volunteer = volunteers.find(v => v.id === volunteerId);
-        return volunteer ? (
-          <Button type="link" onClick={() => navigate(`/volunteers/${volunteerId}`)}>
-            {volunteer.name}
-          </Button>
-        ) : volunteerId;
-      },
-    },
-  ];
+  // Unused for now - TODO: implement volunteer table feature
+  // const scheduledVolunteerColumns = [
+  //   {
+  //     title: 'Volunteer',
+  //     key: 'volunteer',
+  //     render: (volunteerId: string) => {
+  //       const volunteer = volunteers.find(v => v.id === volunteerId);
+  //       return volunteer ? (
+  //         <Button type="link" onClick={() => navigate(`/volunteers/${volunteerId}`)}>
+  //           {volunteer.name}
+  //         </Button>
+  //       ) : volunteerId;
+  //     },
+  //   },
+  // ];
 
   const handleAddVolunteersToAttendance = async (volunteerIds: string[]) => {
     if (!id) return;

@@ -37,7 +37,7 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
     }
   }, [open, event, form]);
 
-  const handleFinish = async (values: any) => {
+  const handleFinish = async (values: { name: string; description: string; timeAndDate: dayjs.Dayjs; assignedGroups?: string[] }) => {
     const data: EventCreateDTO = {
       name: values.name,
       description: values.description,

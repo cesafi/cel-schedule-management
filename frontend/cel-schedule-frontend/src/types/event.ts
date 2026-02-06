@@ -1,5 +1,5 @@
 import { AttendanceType, TimeOutType } from './enums';
-import { AddDepartmentToEventModal } from '../features/events/modals/AddDepartmentToEventModal';
+// Removed unused import: AddDepartmentToEventModal
 
 // Event Schedule types
 

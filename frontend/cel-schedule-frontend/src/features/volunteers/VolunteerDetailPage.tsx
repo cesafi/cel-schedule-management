@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, data } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { volunteersApi } from '../../api';
@@ -27,7 +27,8 @@ export const VolunteerDetailPage: React.FC = () => {
         ]);
         setVolunteer(volunteerData);
         setHistory(historyData);
-      } catch (error) {
+      } catch (err) {
+        console.error('Failed to fetch volunteer data:', err);
         message.error('Failed to load volunteer data');
       } finally {
         setLoading(false);

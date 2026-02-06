@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Menu, Button, Avatar, Dropdown } from 'antd';
+import { Layout, Menu, Avatar, Dropdown } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
@@ -10,14 +10,13 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../features/auth';
-import { AccessLevel } from '../types';
 
 const { Header: AntHeader } = Layout;
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
 
   const menuItems = [
     {
@@ -43,10 +42,9 @@ export const Header: React.FC = () => {
   ];
 
   // Add admin menu for admins only
-  if (
-    // isAdmin
-    true
-  ) {
+  // TODO: Re-enable when admin check is ready
+  // if (isAdmin) {
+  if (user) {
     menuItems.push({
       key: '/admin',
       icon: <SettingOutlined />,

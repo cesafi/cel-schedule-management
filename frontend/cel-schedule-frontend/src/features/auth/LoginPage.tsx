@@ -21,8 +21,9 @@ export const LoginPage: React.FC = () => {
     try {
       await login(values);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -36,7 +37,8 @@ export const LoginPage: React.FC = () => {
       const { url } = await authApi.getGoogleLoginURL();
       // Open Google OAuth in same window
       window.location.href = url;
-    } catch (err: any) {
+    } catch (err) {
+      console.error('Failed to initiate Google login:', err);
       setError('Failed to initiate Google login');
       setLoading(false);
     }
