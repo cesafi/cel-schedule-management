@@ -64,7 +64,7 @@ const formatTimestamp = (timestamp: string): string => {
   return date.toLocaleString();
 };
 
-const renderMetadata = (metadata: Record<string, any>): React.ReactNode => {
+const renderMetadata = (metadata: Record<string, unknown>): React.ReactNode => {
   if (!metadata || Object.keys(metadata).length === 0) {
     return <Text type="secondary">No additional information</Text>;
   }
@@ -154,9 +154,9 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
       title: 'Details',
       dataIndex: 'Metadata',
       key: 'Metadata',
-      render: (metadata: Record<string, any>) => {
+      render: (metadata: Record<string, unknown>) => {
         const message = metadata?.message;
-        return message ? <Text>{message}</Text> : <Text type="secondary">—</Text>;
+        return message ? <Text>{String(message)}</Text> : <Text type="secondary">—</Text>;
       },
     },
   ];

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Tabs, Row, Col } from 'antd';
 import { ArrowLeftOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FireOutlined, FileTextOutlined } from '@ant-design/icons';
-import { volunteersApi, departmentsApi } from '../../api';
-import { Volunteer, StatusHistoryItem, Department, MembershipType } from '../../types';
+import { volunteersApi } from '../../api';
+import { Volunteer, StatusHistoryItem, Department, MembershipType, EventSchedule } from '../../types';
 import { format } from 'date-fns';
 import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
 import { useVolunteerAnalytics, useUpcomingEvents, useDepartments, useEntityLogs } from '../../hooks';
@@ -26,7 +26,7 @@ export const VolunteerDetailPage: React.FC = () => {
   const logPageSize = 20;
 
   // Use analytics hooks
-  const { stats, distribution, trendData, isLoading: analyticsLoading } = useVolunteerAnalytics(id || '');
+  const { stats, distribution, trendData } = useVolunteerAnalytics(id || '');
   const { upcomingEvents, isLoading: upcomingLoading } = useUpcomingEvents({ volunteerId: id });
   
   // Fetch all departments to show volunteer memberships
@@ -215,7 +215,7 @@ export const VolunteerDetailPage: React.FC = () => {
     {
       title: 'Departments',
       key: 'departments',
-      render: (_: unknown, record: any) => {
+      render: (_: unknown, record: EventSchedule) => {
         const deptNames = (record.assignedGroups || [])
           .map((groupId: string) => {
             const dept = (departments || []).find(d => d.id === groupId);
@@ -229,9 +229,9 @@ export const VolunteerDetailPage: React.FC = () => {
     {
       title: 'Status',
       key: 'status',
-      render: (_: unknown, record: any) => {
-        const isScheduled = record.scheduledVolunteers?.includes(id);
-        const isVoluntary = record.voluntaryVolunteers?.includes(id);
+      render: (_: unknown, record: EventSchedule) => {
+        const isScheduled = id ? record.scheduledVolunteers?.includes(id) : false;
+        const isVoluntary = id ? record.voluntaryVolunteers?.includes(id) : false;
         return (
           <Tag color={isScheduled ? 'blue' : 'green'}>
             {isScheduled ? 'Scheduled' : isVoluntary ? 'Voluntary' : 'Assigned'}
@@ -242,7 +242,7 @@ export const VolunteerDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: unknown, record: any) => (
+      render: (_: unknown, record: EventSchedule) => (
         <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
           View Event
         </Button>

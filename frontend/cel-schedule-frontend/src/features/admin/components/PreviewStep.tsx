@@ -1,7 +1,5 @@
 import { Card, Typography, Tag, Space, Alert, Descriptions, Collapse, Empty } from 'antd';
 import {
-  DepartmentPreview,
-  ValidationError,
   BatchImportPreviewResponse,
 } from '../../../types/batchImport';
 import {

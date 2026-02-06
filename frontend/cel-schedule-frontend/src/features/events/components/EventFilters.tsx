@@ -114,7 +114,7 @@ export const EventFilters: React.FC<EventFiltersProps> = ({
               <RangePicker
                 style={{ width: '100%' }}
                 value={customDateStart && customDateEnd ? [dayjs(customDateStart), dayjs(customDateEnd)] : null}
-                onChange={handleCustomDateChange as any}
+                onChange={handleCustomDateChange as (dates: [Dayjs | null, Dayjs | null] | null) => void}
               />
             </Col>
           )}

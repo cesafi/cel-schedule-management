@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Typography, 
   Card, 
@@ -17,13 +17,11 @@ import {
   UserOutlined, 
   PlusOutlined,
   AlertOutlined,
-  ClockCircleOutlined,
-  CheckCircleOutlined
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { isAfter, isBefore, subDays, addDays, isToday, parseISO } from 'date-fns';
 import { useAuth } from '../features/auth';
-import { EventSchedule } from '../types';
 import { EventCard } from '../components/EventCard';
 import { useEvents, useVolunteers, useDepartments } from '../hooks';
 

@@ -3,9 +3,7 @@ import { message } from 'antd';
 import { batchImportApi } from '../api';
 import {
   BatchImportState,
-  BatchImportPreviewResponse,
   ConflictResolution,
-  BatchImportExecuteResponse,
 } from '../types/batchImport';
 
 export const useBatchImport = () => {

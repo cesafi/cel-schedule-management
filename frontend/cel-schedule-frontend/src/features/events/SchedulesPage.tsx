@@ -10,9 +10,9 @@ import {
   EventsTableView, 
   EventsCardView, 
   EventsCalendarView,
-  EventStatistics,
-  useViewMode 
+  EventStatistics
 } from './components';
+import { useViewMode } from './hooks/useViewMode';
 import { useEvents, useDepartments, useEventFilters, useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks';
 
 const { Title } = Typography;
@@ -61,18 +61,13 @@ export const SchedulesPage: React.FC = () => {
   }, [deleteEvent]);
 
   const handleSubmit = useCallback(async (data: EventCreateDTO) => {
-    try {
-      if (editingEvent) {
-        await updateEvent.mutateAsync(data);
-      } else {
-        await createEvent.mutateAsync(data);
-      }
-      setModalOpen(false);
-      setEditingEvent(null);
-    } catch (err) {
-      // Error messages handled by mutation hooks
-      throw err;
+    if (editingEvent) {
+      await updateEvent.mutateAsync(data);
+    } else {
+      await createEvent.mutateAsync(data);
     }
+    setModalOpen(false);
+    setEditingEvent(null);
   }, [editingEvent, createEvent, updateEvent]);
 
   const handleModalCancel = useCallback(() => {

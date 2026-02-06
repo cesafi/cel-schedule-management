@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Calendar, Badge, Modal, List, Tag, Button, Space } from 'antd';
 import { EventSchedule } from '../../../types';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { CalendarOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';

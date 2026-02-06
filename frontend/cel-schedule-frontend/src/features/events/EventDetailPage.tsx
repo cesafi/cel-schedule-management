@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined } from '@ant-design/icons';
 import { eventsApi } from '../../api';
-import { EventSchedule, Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
+import { Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
 import { format } from 'date-fns';
 import { useAuth } from '../auth';
@@ -64,7 +64,7 @@ export const EventDetailPage: React.FC = () => {
     }
   }, [id, queryClient]);
 
-  const handleTimeIn = async (volunteerId: string, values: { timeIn?: string; attendanceType?: AttendanceType }) => {
+  const handleTimeIn = useCallback(async (volunteerId: string, values: { timeIn?: string; attendanceType: AttendanceType }) => {
     if (!id) return;
     
     try {
@@ -81,9 +81,9 @@ export const EventDetailPage: React.FC = () => {
       console.error('Failed to check in volunteer:', err);
       message.error('Failed to check in volunteer');
     }
-  };
+  }, [id, refetchEvent, timeInForm]);
 
-  const handleTimeOut = async (volunteerId: string, values: { timeOut?: string }) => {
+  const handleTimeOut = useCallback(async (volunteerId: string, values: { timeOut?: string }) => {
     if (!id) return;
     
     try {
@@ -100,7 +100,7 @@ export const EventDetailPage: React.FC = () => {
       console.error('Failed to check out volunteer:', err);
       message.error('Failed to check out volunteer');
     }
-  };
+  }, [id, refetchEvent, timeOutForm]);
 
   const handleAddDepartments = async (departmentIds: string[]) => {
     if (!id || !event) return;
@@ -116,7 +116,7 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
-  const handleRemoveDepartment = async (departmentId: string) => {
+  const handleRemoveDepartment = useCallback(async (departmentId: string) => {
     if (!id) return;
     
     try {
@@ -127,9 +127,9 @@ export const EventDetailPage: React.FC = () => {
       console.error('Failed to remove department:', err);
       message.error('Failed to remove department');
     }
-  };
+  }, [id, refetchEvent]);
 
-  const handleRemoveVolunteer = async (volunteerId: string) => {
+  const handleRemoveVolunteer = useCallback(async (volunteerId: string) => {
     if (!id) return;
     
     try {
@@ -140,7 +140,7 @@ export const EventDetailPage: React.FC = () => {
       console.error('Failed to remove volunteer:', err);
       message.error('Failed to remove volunteer');
     }
-  };
+  }, [id, refetchEvent]);
 
   // Unused for now - TODO: implement volunteer addition feature
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -165,7 +165,7 @@ export const EventDetailPage: React.FC = () => {
 
   const getVolunteerDepartments = useCallback((volunteerId: string): Department[] => {
     return departments.filter((d: Department) => 
-      d.volunteerMembers?.some((m: any) => m.volunteerID === volunteerId)
+      d.volunteerMembers?.some((m: { volunteerID: string }) => m.volunteerID === volunteerId)
     );
   }, [departments]);
 
@@ -411,7 +411,7 @@ export const EventDetailPage: React.FC = () => {
         );
       },
     },
-  ], [volunteerMap, navigate, isAdmin, canManageVolunteer, editingTimeIn, editingTimeOut, timeInForm, timeOutForm, getVolunteerDepartments]);
+  ], [volunteerMap, navigate, isAdmin, canManageVolunteer, editingTimeIn, editingTimeOut, timeInForm, timeOutForm, getVolunteerDepartments, handleTimeIn, handleTimeOut, handleRemoveVolunteer]);
 
   const departmentColumns = useMemo(() => [
     {

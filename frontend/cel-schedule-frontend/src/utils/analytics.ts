@@ -158,7 +158,7 @@ export function groupStatusesByMonth(events: EventSchedule[]): TrendDataPoint[] 
   // Convert to array and sort by date
   return Array.from(monthMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([_, dataPoint]) => dataPoint);
+    .map(([, dataPoint]) => dataPoint);
 }
 
 /**

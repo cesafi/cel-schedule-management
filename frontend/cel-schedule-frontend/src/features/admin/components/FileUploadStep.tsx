@@ -1,5 +1,5 @@
-import { Upload, Button, Typography, Alert, Space } from 'antd';
-import { UploadOutlined, InboxOutlined } from '@ant-design/icons';
+import { Upload, Typography, Alert, Space } from 'antd';
+import { InboxOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 
 const { Title, Paragraph, Text } = Typography;

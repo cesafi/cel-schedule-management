@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { eventsApi } from '../api';
-import { EventSchedule, EventCreateDTO, EventUpdateDTO } from '../types';
+import { EventCreateDTO, EventUpdateDTO } from '../types';
 import { message } from 'antd';
 
 // Query keys

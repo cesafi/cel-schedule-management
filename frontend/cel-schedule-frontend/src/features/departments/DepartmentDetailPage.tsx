@@ -3,13 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
-import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO } from '../../types';
+import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO, EventSchedule } from '../../types';
 import { format } from 'date-fns';
 import { AddMemberModal } from './modals/AddMemberModal';
 import { useAuth } from '../auth';
 import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
 import { useDepartmentAnalytics, useUpcomingEvents, useEntityLogs } from '../../hooks';
-import { filterEventsByDateRange } from '../../utils/analytics';
 
 const { Title } = Typography;
 
@@ -28,7 +27,7 @@ export const DepartmentDetailPage: React.FC = () => {
   const logPageSize = 20;
 
   // Use analytics hooks
-  const { stats, distribution, trendData, memberPerformance, isLoading: analyticsLoading } = useDepartmentAnalytics(id || '');
+  const { stats, distribution, trendData, memberPerformance } = useDepartmentAnalytics(id || '');
   const { upcomingEvents, isLoading: upcomingLoading } = useUpcomingEvents({ departmentId: id });
   
   // Fetch logs for admin users only
@@ -262,7 +261,7 @@ export const DepartmentDetailPage: React.FC = () => {
     {
       title: 'Scheduled Members',
       key: 'scheduledCount',
-      render: (_: unknown, record: any) => {
+      render: (_: unknown, record: EventSchedule) => {
         const deptMembers = department.volunteerMembers?.map(m => m.volunteerID) || [];
         const scheduled = (record.scheduledVolunteers || []).filter((v: string) => deptMembers.includes(v));
         return `${scheduled.length} / ${deptMembers.length}`;
@@ -271,7 +270,7 @@ export const DepartmentDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: unknown, record: any) => (
+      render: (_: unknown, record: EventSchedule) => (
         <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
           View Event
         </Button>

@@ -1,6 +1,6 @@
 import { Form, Select, DatePicker, Button, Space, Input } from 'antd';
 import { LogType } from '../../../types';
-import dayjs, { Dayjs } from 'dayjs';
+import { Dayjs } from 'dayjs';
 
 const { RangePicker } = DatePicker;
 

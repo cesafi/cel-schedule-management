@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { departmentsApi } from '../api';
-import { DepartmentAnalytics, MemberPerformance } from '../types';
+import { DepartmentAnalytics, MemberPerformance, Volunteer } from '../types';
 import { EventSchedule, ScheduleStatus } from '../types/event';
 import {
   calculateAttendanceRate,
@@ -13,7 +13,7 @@ import {
   AttendanceDistribution,
 } from '../utils/analytics';
 import { AttendanceType } from '../types/enums';
-import { useDepartments, useVolunteers } from './';
+import { useVolunteers } from './useVolunteers';
 
 interface UseDepartmentAnalyticsReturn {
   stats: DepartmentAnalytics | null;
@@ -41,7 +41,7 @@ export function useDepartmentAnalytics(departmentId: string): UseDepartmentAnaly
 
   // Fetch all volunteers for name lookup
   const { data: volunteers, isLoading: volunteersLoading } = useVolunteers();
-  const volunteerMap = useMemo(() => new Map((volunteers || []).map(v => [v.id, v])), [volunteers]);
+  const volunteerMap = useMemo(() => new Map((volunteers || []).map((v: Volunteer) => [v.id, v])), [volunteers]);
 
   const isLoading = historyLoading || deptLoading || volunteersLoading;
 
@@ -156,7 +156,7 @@ export function useDepartmentAnalytics(departmentId: string): UseDepartmentAnaly
       
       // This is a simplified calculation - ideally we'd filter events per volunteer
       const memberStatuses = events.flatMap(e => e.statuses || []);
-      const distribution = getAttendanceDistribution(memberStatuses);
+      getAttendanceDistribution(memberStatuses);
       
       performanceMap.set(member.volunteerID, {
         statuses: memberStatuses,
@@ -174,7 +174,7 @@ export function useDepartmentAnalytics(departmentId: string): UseDepartmentAnaly
 
         return {
           volunteerId: member.volunteerID,
-          volunteerName: volunteer?.name || 'Unknown',
+          volunteerName: volunteer.name || 'Unknown',
           eventsAttended: data.events.length,
           attendanceRate: calculateAttendanceRate(data.statuses),
           punctualityRate: calculatePunctualityRate(data.statuses),
