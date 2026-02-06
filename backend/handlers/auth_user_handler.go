@@ -4,6 +4,7 @@ import (
 	"net/http"
 	dtos "sheduling-server/DTOs"
 	"sheduling-server/models"
+	sub_model "sheduling-server/models/sub_models"
 	"sheduling-server/repository"
 	"sheduling-server/utils"
 	"time"
@@ -67,6 +68,14 @@ func (h *AuthUserHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Log user creation
+	utils.CreateAuditLog(c, h.db, sub_model.USER_CREATED, map[string]interface{}{
+		"targetUserId":   user.ID,
+		"targetUsername": user.Username,
+		"accessLevel":    int(user.AccessLevel),
+		"volunteerId":    user.VolunteerID,
+	})
+
 	// Return sanitized output (no password)
 	output := dtos.GetByID_AuthUser_Output{
 		ID:          user.ID,
@@ -96,6 +105,12 @@ func (h *AuthUserHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Track what changed for logging
+	changes := make(map[string]interface{})
+	oldAccessLevel := int(user.AccessLevel)
+	passwordChanged := false
+	disabledStatusChanged := false
+
 	// Update fields if provided
 	if input.Password != nil {
 		hashedPassword, err := utils.HashPassword(*input.Password)
@@ -104,14 +119,26 @@ func (h *AuthUserHandler) Update(c *gin.Context) {
 			return
 		}
 		user.Password = hashedPassword
+		passwordChanged = true
+		changes["passwordChanged"] = true
 	}
 
 	if input.AccessLevel != nil {
-		user.AccessLevel = models.AuthLevel(*input.AccessLevel)
+		newAccessLevel := models.AuthLevel(*input.AccessLevel)
+		if user.AccessLevel != newAccessLevel {
+			changes["oldAccessLevel"] = int(user.AccessLevel)
+			changes["newAccessLevel"] = int(newAccessLevel)
+			user.AccessLevel = newAccessLevel
+		}
 	}
 
 	if input.IsDisabled != nil {
-		user.IsDisabled = *input.IsDisabled
+		if user.IsDisabled != *input.IsDisabled {
+			disabledStatusChanged = true
+			changes["oldIsDisabled"] = user.IsDisabled
+			changes["newIsDisabled"] = *input.IsDisabled
+			user.IsDisabled = *input.IsDisabled
+		}
 	}
 
 	user.LastUpdated = time.Now()
@@ -119,6 +146,40 @@ func (h *AuthUserHandler) Update(c *gin.Context) {
 	if err := h.db.AuthUsers().UpdateUser(c.Request.Context(), user); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Log the update with appropriate log type
+	if disabledStatusChanged {
+		if user.IsDisabled {
+			utils.CreateAuditLog(c, h.db, sub_model.USER_DISABLED, map[string]interface{}{
+				"targetUserId":   user.ID,
+				"targetUsername": user.Username,
+				"changes":        changes,
+			})
+		} else {
+			utils.CreateAuditLog(c, h.db, sub_model.USER_ENABLED, map[string]interface{}{
+				"targetUserId":   user.ID,
+				"targetUsername": user.Username,
+				"changes":        changes,
+			})
+		}
+	} else if oldAccessLevel != int(user.AccessLevel) {
+		utils.CreateAuditLog(c, h.db, sub_model.ACCESS_LEVEL_CHANGED, map[string]interface{}{
+			"targetUserId":   user.ID,
+			"targetUsername": user.Username,
+			"changes":        changes,
+		})
+	} else if passwordChanged {
+		utils.CreateAuditLog(c, h.db, sub_model.PASSWORD_CHANGED, map[string]interface{}{
+			"targetUserId":   user.ID,
+			"targetUsername": user.Username,
+		})
+	} else {
+		utils.CreateAuditLog(c, h.db, sub_model.USER_UPDATED, map[string]interface{}{
+			"targetUserId":   user.ID,
+			"targetUsername": user.Username,
+			"changes":        changes,
+		})
 	}
 
 	// Return sanitized output
@@ -158,6 +219,12 @@ func (h *AuthUserHandler) Login(c *gin.Context) {
 
 	// Verify password
 	if !utils.CheckPasswordHash(input.Password, user.Password) {
+		// Log failed login attempt
+		utils.CreateAuditLogWithUserInfo(c.Request.Context(), h.db, sub_model.USER_LOGIN_FAILED, user.ID, user.Username, map[string]interface{}{
+			"attemptedUsername": input.Username,
+			"reason":            "invalid_password",
+		})
+
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
@@ -172,6 +239,12 @@ func (h *AuthUserHandler) Login(c *gin.Context) {
 	// Calculate expiration time (24 hours default)
 	expirationHours := 24
 	expiresAt := time.Now().Add(time.Duration(expirationHours) * time.Hour)
+
+	// Log successful login
+	utils.CreateAuditLogWithUserInfo(c.Request.Context(), h.db, sub_model.USER_LOGIN, user.ID, user.Username, map[string]interface{}{
+		"loginMethod": "password",
+		"accessLevel": int(user.AccessLevel),
+	})
 
 	output := dtos.Login_Output{
 		Token:       token,

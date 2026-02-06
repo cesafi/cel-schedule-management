@@ -7,4 +7,5 @@ export * from './useVolunteerAnalytics';
 export * from './useDepartmentAnalytics';
 export * from './useUpcomingEvents';
 export * from './useBatchImport';
+export * from './useLogs';
 

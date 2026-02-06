@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Typography, Card, Tabs, Form, Input, Button, Select, message } from 'antd';
 import { UserAddOutlined, TeamOutlined, UploadOutlined } from '@ant-design/icons';
 import { authApi, volunteersApi } from '../../api';
-import { AuthUserCreateDTO, VolunteerCreateDTO, AccessLevel } from '../../types';
-import { BatchImportWizard } from './components';
+import { AuthUserCreateDTO, VolunteerCreateDTO, AccessLevel, LogType } from '../../types';
+import { BatchImportWizard, LogFilters, SystemLogsTable, LogFilterValues } from './components';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLogs } from '../../hooks';
 
 const { Title, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -15,6 +16,18 @@ export const AdminPage: React.FC = () => {
   const [userForm] = Form.useForm();
   const [volunteerForm] = Form.useForm();
   const queryClient = useQueryClient();
+
+  // Logs state
+  const [logFilters, setLogFilters] = useState<{
+    logType?: LogType;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+    limit: number;
+    offset: number;
+  }>({ limit: 50, offset: 0 });
+
+  const { data: logsData, isLoading: logsLoading } = useLogs(logFilters);
 
   const handleCreateUser = async (values: AuthUserCreateDTO) => {
     setLoading(true);
@@ -55,6 +68,34 @@ export const AdminPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['departments'] });
     queryClient.invalidateQueries({ queryKey: ['volunteers'] });
     message.success('Batch import completed! Data has been refreshed.');
+  };
+
+  const handleLogFilterChange = (filters: LogFilterValues) => {
+    const newFilters: typeof logFilters = {
+      limit: 50,
+      offset: 0,
+      logType: filters.logType,
+      userId: filters.userId,
+    };
+
+    if (filters.dateRange && filters.dateRange.length === 2) {
+      newFilters.startDate = filters.dateRange[0].toISOString();
+      newFilters.endDate = filters.dateRange[1].toISOString();
+    }
+
+    setLogFilters(newFilters);
+  };
+
+  const handleLogFilterReset = () => {
+    setLogFilters({ limit: 50, offset: 0 });
+  };
+
+  const handleLogPageChange = (page: number, pageSize: number) => {
+    setLogFilters((prev) => ({
+      ...prev,
+      offset: (page - 1) * pageSize,
+      limit: pageSize,
+    }));
   };
 
   return (
@@ -150,11 +191,19 @@ export const AdminPage: React.FC = () => {
 
         <TabPane tab="System Logs" key="logs">
           <Card title="System Logs">
-            <Paragraph>System logging interface - Coming soon</Paragraph>
-            <Paragraph type="secondary">
-              Will display system events such as user creation, data changes, and errors.
-              Backend needs to implement logging endpoints.
+            <Paragraph>
+              View and filter system audit logs including authentication, user management, and
+              access control events.
             </Paragraph>
+            <LogFilters onFilterChange={handleLogFilterChange} onReset={handleLogFilterReset} />
+            <SystemLogsTable
+              logs={logsData?.logs || []}
+              total={logsData?.total || 0}
+              loading={logsLoading}
+              currentPage={Math.floor(logFilters.offset / logFilters.limit) + 1}
+              pageSize={logFilters.limit}
+              onPageChange={handleLogPageChange}
+            />
           </Card>
         </TabPane>
       </Tabs>

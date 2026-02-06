@@ -87,6 +87,13 @@ func (db *FirebaseDB) EventSchedules() repository.EventScheduleRepository {
 	}
 }
 
+// Logs returns the log repository implementation
+func (db *FirebaseDB) Logs() repository.LogRepository {
+	return &logRepo{
+		firestore: db.firestore,
+	}
+}
+
 // Close closes all Firebase connections
 func (db *FirebaseDB) Close() error {
 	return db.firestore.Close()
