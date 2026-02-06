@@ -1,0 +1,276 @@
+import React, { useMemo, useCallback } from 'react';
+import { Table, Button, Space, Popconfirm, Tag, Tooltip } from 'antd';
+import { EditOutlined, DeleteOutlined, EyeOutlined, EnvironmentOutlined, UserOutlined, TeamOutlined, WarningOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { EventSchedule, Department } from '../../../types';
+import { format, isPast, isToday } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+
+interface EventsTableViewProps {
+  events: EventSchedule[];
+  departments: Department[];
+  isAdmin: boolean;
+  loading?: boolean;
+  onEdit: (event: EventSchedule) => void;
+  onDelete: (id: string) => void;
+}
+
+export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
+  events,
+  departments,
+  isAdmin,
+  loading = false,
+  onEdit,
+  onDelete,
+}) => {
+  const navigate = useNavigate();
+
+  // Create department map for O(1) lookups
+  const departmentMap = useMemo(() => {
+    return new Map(departments.map(d => [d.id, d]));
+  }, [departments]);
+
+  const handleView = useCallback((id: string) => {
+    navigate(`/events/${id}`);
+  }, [navigate]);
+
+  const handleEdit = useCallback((event: EventSchedule) => {
+    onEdit(event);
+  }, [onEdit]);
+
+  const handleDelete = useCallback((id: string) => {
+    onDelete(id);
+  }, [onDelete]);
+
+  // Memoize columns
+  const columns = useMemo(() => [
+    {
+      title: 'Event Name',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a: EventSchedule, b: EventSchedule) => a.name.localeCompare(b.name),
+      render: (name: string, record: EventSchedule) => {
+        const today = isToday(new Date(record.timeAndDate));
+        return (
+          <Space>
+            {name}
+            {today && <Tag color="green">Today</Tag>}
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Date & Time',
+      dataIndex: 'timeAndDate',
+      key: 'timeAndDate',
+      render: (date: string) => {
+        const eventDate = new Date(date);
+        const past = isPast(eventDate) && !isToday(eventDate);
+        const today = isToday(eventDate);
+        
+        return (
+          <Space direction="vertical" size="small">
+            <span style={{ 
+              fontWeight: today ? 'bold' : 'normal',
+              color: past ? '#999' : undefined 
+            }}>
+              {format(eventDate, 'MMM dd, yyyy HH:mm')}
+            </span>
+            <span style={{ fontSize: '0.85em', color: '#666' }}>
+              {formatDistanceToNow(eventDate, { addSuffix: true })}
+            </span>
+          </Space>
+        );
+      },
+      sorter: (a: EventSchedule, b: EventSchedule) => 
+        new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime(),
+      defaultSortOrder: 'ascend' as const,
+    },
+    {
+      title: 'Departments',
+      dataIndex: 'assignedGroups',
+      key: 'assignedGroups',
+      render: (groups: string[]) => {
+        if (!groups || groups.length === 0) {
+          return <span style={{ color: '#999' }}>None</span>;
+        }
+        
+        const deptNames = groups
+          .map(id => departmentMap.get(id)?.departmentName)
+          .filter(Boolean);
+
+        if (deptNames.length === 0) return <span style={{ color: '#999' }}>None</span>;
+
+        return (
+          <Tooltip title={deptNames.join(', ')}>
+            <Space>
+              <TeamOutlined />
+              <Tag color="blue">{deptNames.length} Department{deptNames.length !== 1 ? 's' : ''}</Tag>
+            </Space>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Volunteers',
+      key: 'volunteers',
+      render: (_: unknown, record: EventSchedule) => {
+        const scheduled = record.scheduledVolunteers?.length || 0;
+        const voluntary = record.voluntaryVolunteers?.length || 0;
+        const total = scheduled + voluntary;
+        const checkedIn = record.statuses?.length || 0;
+        const needsHelp = total < 3;
+
+        return (
+          <Space>
+            <UserOutlined />
+            <span style={{ color: needsHelp ? '#ff4d4f' : undefined }}>
+              {checkedIn}/{total}
+            </span>
+            {needsHelp && (
+              <Tooltip title="Needs more volunteers">
+                <WarningOutlined style={{ color: '#ff9800' }} />
+              </Tooltip>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Location',
+      dataIndex: 'location',
+      key: 'location',
+      render: (location: EventSchedule['location']) => {
+        if (!location) return <span style={{ color: '#999' }}>-</span>;
+        
+        const shortAddress = location.address.length > 30 
+          ? location.address.substring(0, 30) + '...'
+          : location.address;
+
+        return (
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Space>
+              <EnvironmentOutlined />
+              {shortAddress}
+            </Space>
+          </a>
+        );
+      },
+    },
+    {
+      title: 'Status',
+      dataIndex: 'isDisabled',
+      key: 'isDisabled',
+      render: (isDisabled: boolean, record: EventSchedule) => {
+        const total = (record.scheduledVolunteers?.length || 0) + (record.voluntaryVolunteers?.length || 0);
+        const needsHelp = total < 3;
+
+        return (
+          <Space direction="vertical" size="small">
+            <Tag color={isDisabled ? 'red' : 'green'}>
+              {isDisabled ? 'Cancelled' : 'Active'}
+            </Tag>
+            {!isDisabled && needsHelp && (
+              <Tag color="orange">Needs Help</Tag>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: unknown, record: EventSchedule) => (
+        <Space size="small">
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => handleView(record.id)}
+          >
+            View
+          </Button>
+          {isAdmin && (
+            <>
+              <Button
+                type="link"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(record)}
+              >
+                Edit
+              </Button>
+              <Popconfirm
+                title="Delete event"
+                description="Are you sure you want to delete this event?"
+                onConfirm={() => handleDelete(record.id)}
+                okText="Yes"
+                cancelText="No"
+              >
+                <Button type="link" danger icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              </Popconfirm>
+            </>
+          )}
+        </Space>
+      ),
+    },
+  ], [departmentMap, isAdmin, handleView, handleEdit, handleDelete]);
+
+  // Add row className for styling
+  const rowClassName = useCallback((record: EventSchedule) => {
+    const eventDate = new Date(record.timeAndDate);
+    if (isToday(eventDate)) return 'event-row-today';
+    if (isPast(eventDate)) return 'event-row-past';
+    return 'event-row-upcoming';
+  }, []);
+
+  return (
+    <>
+      <style>{`
+        .event-row-today {
+          background-color: #f6ffed !important;
+          border-left: 4px solid #52c41a;
+        }
+        .event-row-past {
+          opacity: 0.6;
+          border-left: 4px solid #d9d9d9;
+        }
+        .event-row-upcoming {
+          border-left: 4px solid #1890ff;
+        }
+        .event-row-today:hover,
+        .event-row-past:hover,
+        .event-row-upcoming:hover {
+          background-color: #fafafa !important;
+        }
+      `}</style>
+      <Table
+        columns={columns}
+        dataSource={events}
+        rowKey="id"
+        loading={loading}
+        rowClassName={rowClassName}
+        pagination={{ 
+          pageSize: 10,
+          showSizeChanger: true,
+          pageSizeOptions: ['10', '25', '50', '100'],
+          showTotal: (total, range) => `Showing ${range[0]}-${range[1]} of ${total} events`,
+        }}
+        expandable={{
+          expandedRowRender: (record) => (
+            <div style={{ paddingLeft: 24 }}>
+              <p style={{ margin: 0 }}><strong>Description:</strong> {record.description}</p>
+            </div>
+          ),
+        }}
+      />
+    </>
+  );
+});
+
+EventsTableView.displayName = 'EventsTableView';

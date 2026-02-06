@@ -6,6 +6,7 @@ import (
 	"sheduling-server/models"
 	sub_model "sheduling-server/models/sub_models"
 	"sheduling-server/repository"
+	"sheduling-server/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -77,11 +78,25 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 		IsDisabled:       department.IsDisabled,
 	}
 
+	// Log department creation
+	utils.CreateEnhancedLog(c, h.db, sub_model.DEPARTMENT_CREATED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_DEPARTMENT_ID:   department.ID,
+		sub_model.META_DEPARTMENT_NAME: department.DepartmentName,
+	})
+
 	c.JSON(201, output)
 }
 
 func (h *DepartmentHandler) Update(c *gin.Context) {
 	id := c.Param("id")
+
+	// Get existing department for comparison
+	existingDept, err := h.db.Departments().GetByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "Department not found"})
+		return
+	}
+
 	var department models.DepartmentModel
 	if err := c.ShouldBindJSON(&department); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -92,6 +107,17 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 	if err := h.db.Departments().UpdateDepartment(c.Request.Context(), &department); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Log department update if name changed
+	if existingDept.DepartmentName != department.DepartmentName {
+		utils.CreateEnhancedLog(c, h.db, sub_model.DEPARTMENT_UPDATED, sub_model.SEVERITY_INFO, map[string]interface{}{
+			sub_model.META_DEPARTMENT_ID: department.ID,
+			sub_model.META_CHANGES: map[string]interface{}{
+				sub_model.META_OLD_DEPARTMENT_NAME: existingDept.DepartmentName,
+				sub_model.META_NEW_DEPARTMENT_NAME: department.DepartmentName,
+			},
+		})
 	}
 
 	c.JSON(200, department)
@@ -114,6 +140,13 @@ func (h *DepartmentHandler) Delete(c *gin.Context) {
 	// 	c.JSON(500, gin.H{"error": err.Error()})
 	// 	return
 	// }
+
+	// Log department deletion (soft delete)
+	utils.CreateEnhancedLog(c, h.db, sub_model.DEPARTMENT_DELETED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_DEPARTMENT_ID:   department.ID,
+		sub_model.META_DEPARTMENT_NAME: department.DepartmentName,
+		sub_model.META_REASON:          "Soft delete via Delete endpoint",
+	})
 
 	c.JSON(200, gin.H{"message": fmt.Sprintf("Department %s deleted successfully", id)})
 }
@@ -141,12 +174,43 @@ func (h *DepartmentHandler) AddMember(c *gin.Context) {
 		return
 	}
 
+	// Log member addition
+	dept, _ := h.db.Departments().GetByID(c.Request.Context(), departmentID)
+	deptName := ""
+	if dept != nil {
+		deptName = dept.DepartmentName
+	}
+	volunteer, _ := h.db.Volunteers().GetVolunteerByID(c.Request.Context(), input.VolunteerID)
+	volunteerName := ""
+	if volunteer != nil {
+		volunteerName = volunteer.Name
+	}
+	utils.CreateEnhancedLog(c, h.db, sub_model.DEPARTMENT_MEMBER_ADDED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_DEPARTMENT_ID:   departmentID,
+		sub_model.META_DEPARTMENT_NAME: deptName,
+		sub_model.META_VOLUNTEER_ID:    input.VolunteerID,
+		sub_model.META_VOLUNTEER_NAME:  volunteerName,
+		sub_model.META_MEMBERSHIP_TYPE: string(input.MembershipType),
+	})
+
 	c.JSON(200, gin.H{"message": "Member added successfully"})
 }
 
 func (h *DepartmentHandler) UpdateMemberType(c *gin.Context) {
 	departmentID := c.Param("id")
 	volunteerID := c.Param("volunteerId")
+
+	// Get existing membership info for logging
+	dept, _ := h.db.Departments().GetByID(c.Request.Context(), departmentID)
+	oldMembershipType := ""
+	if dept != nil {
+		for _, member := range dept.VolunteerMembers {
+			if member.VolunteerID == volunteerID {
+				oldMembershipType = string(member.MembershipType)
+				break
+			}
+		}
+	}
 
 	var input dtos.UpdateMemberType_Input
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -158,6 +222,25 @@ func (h *DepartmentHandler) UpdateMemberType(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log role change
+	deptName := ""
+	if dept != nil {
+		deptName = dept.DepartmentName
+	}
+	volunteer, _ := h.db.Volunteers().GetVolunteerByID(c.Request.Context(), volunteerID)
+	volunteerName := ""
+	if volunteer != nil {
+		volunteerName = volunteer.Name
+	}
+	utils.CreateEnhancedLog(c, h.db, sub_model.DEPARTMENT_ROLE_CHANGED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_DEPARTMENT_ID:       departmentID,
+		sub_model.META_DEPARTMENT_NAME:     deptName,
+		sub_model.META_VOLUNTEER_ID:        volunteerID,
+		sub_model.META_VOLUNTEER_NAME:      volunteerName,
+		sub_model.META_OLD_MEMBERSHIP_TYPE: oldMembershipType,
+		sub_model.META_NEW_MEMBERSHIP_TYPE: input.MembershipType,
+	})
 
 	c.JSON(200, gin.H{"message": "Member type updated successfully"})
 }
@@ -171,5 +254,59 @@ func (h *DepartmentHandler) RemoveMember(c *gin.Context) {
 		return
 	}
 
+	// Log member removal
+	dept, _ := h.db.Departments().GetByID(c.Request.Context(), departmentID)
+	deptName := ""
+	if dept != nil {
+		deptName = dept.DepartmentName
+	}
+	volunteer, _ := h.db.Volunteers().GetVolunteerByID(c.Request.Context(), volunteerID)
+	volunteerName := ""
+	if volunteer != nil {
+		volunteerName = volunteer.Name
+	}
+	utils.CreateEnhancedLog(c, h.db, sub_model.DEPARTMENT_MEMBER_REMOVED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_DEPARTMENT_ID:   departmentID,
+		sub_model.META_DEPARTMENT_NAME: deptName,
+		sub_model.META_VOLUNTEER_ID:    volunteerID,
+		sub_model.META_VOLUNTEER_NAME:  volunteerName,
+	})
+
 	c.JSON(200, gin.H{"message": "Member removed successfully"})
+}
+
+// GetDepartmentLogs retrieves system logs for a specific department (admin only)
+// GET /api/departments/:id/logs
+func (h *DepartmentHandler) GetDepartmentLogs(c *gin.Context) {
+	id := c.Param("id")
+
+	// Parse pagination params
+	var query struct {
+		Limit  int `form:"limit"`
+		Offset int `form:"offset"`
+	}
+	if err := c.ShouldBindQuery(&query); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Set defaults
+	if query.Limit <= 0 {
+		query.Limit = 20
+	}
+	if query.Offset < 0 {
+		query.Offset = 0
+	}
+
+	// Fetch logs
+	logs, total, err := h.db.Logs().GetLogsByDepartmentID(c.Request.Context(), id, query.Limit, query.Offset)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"logs":  logs,
+		"total": total,
+	})
 }

@@ -30,7 +30,8 @@ export const AccountSettings: React.FC = () => {
       
       // Redirect to Google OAuth
       window.location.href = url;
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as { message?: string };
       console.error('Failed to initiate Google linking:', error);
       message.error('Failed to initiate Google linking');
       setLoading(false);

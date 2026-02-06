@@ -57,6 +57,28 @@ func main() {
 	eventHandler := handlers.NewEventHandler(db)
 	authUserHandler := handlers.NewAuthUserHandler(db)
 	oauthHandler := handlers.NewOAuthHandler(db)
+	batchImportHandler := handlers.NewBatchImportHandler(db)
+	logHandler := handlers.NewLogHandler(db)
+
+	// Initialize and start log retention scheduler
+	retentionDays := 365 // Default to 1 year
+	if envRetentionDays := os.Getenv("LOG_RETENTION_DAYS"); envRetentionDays != "" {
+		if days, err := fmt.Sscanf(envRetentionDays, "%d", &retentionDays); err == nil && days > 0 {
+			log.Printf("Using LOG_RETENTION_DAYS from environment: %d days", retentionDays)
+		} else {
+			log.Printf("Invalid LOG_RETENTION_DAYS value, using default: 365 days")
+			retentionDays = 365
+		}
+	} else {
+		log.Printf("LOG_RETENTION_DAYS not set, using default: 365 days")
+	}
+
+	retentionScheduler := utils.NewRetentionScheduler(db.Logs(), utils.RetentionSchedulerConfig{
+		RetentionDays:  retentionDays,
+		RunImmediately: false, // Set to true for testing
+	})
+	retentionScheduler.Start(ctx)
+	log.Println("Log retention scheduler initialized and started")
 
 	// Setup Gin router
 	r := gin.Default()
@@ -90,6 +112,23 @@ func main() {
 		})
 	})
 
+	// Readiness check - verifies Firebase connection is ready
+	r.GET("/health/ready", func(c *gin.Context) {
+		// Check if database is initialized
+		if db == nil {
+			c.JSON(503, gin.H{
+				"status":  "initializing",
+				"message": "Database is not ready yet",
+			})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"status":  "ready",
+			"message": "Service is ready to accept requests",
+		})
+	})
+
 	// Public auth routes
 	auth := r.Group("/api/auth")
 	{
@@ -117,6 +156,7 @@ func main() {
 		volunteers.POST("", middleware.RequireAuth(), middleware.RequireAdmin(), volunteerHandler.Create)
 		volunteers.PUT("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), volunteerHandler.Update)
 		volunteers.DELETE("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), volunteerHandler.Delete)
+		volunteers.GET("/:id/logs", middleware.RequireAuth(), middleware.RequireAdmin(), volunteerHandler.GetVolunteerLogs)
 	}
 
 	// Department routes - Public GET, Admin CUD, DeptHead member management
@@ -131,6 +171,7 @@ func main() {
 		departments.POST("", middleware.RequireAuth(), middleware.RequireAdmin(), departmentHandler.Create)
 		departments.PUT("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), departmentHandler.Update)
 		departments.DELETE("/:id", middleware.RequireAuth(), middleware.RequireAdmin(), departmentHandler.Delete)
+		departments.GET("/:id/logs", middleware.RequireAuth(), middleware.RequireAdmin(), departmentHandler.GetDepartmentLogs)
 
 		// Department head can manage their own department members
 		departments.POST("/:id/members", middleware.RequireAuth(), middleware.ValidateIsDepartmentHead(db), departmentHandler.AddMember)
@@ -160,6 +201,7 @@ func main() {
 		// Admin-only department management in events
 		events.PUT("/:id/AddDepartment", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.AddDepartmentToEvent)
 		events.DELETE("/:id/departments/:departmentId", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.RemoveDepartmentFromEvent)
+		events.GET("/:id/logs", middleware.RequireAuth(), middleware.RequireAdmin(), eventHandler.GetEventLogs)
 	}
 
 	// Auth User routes (Admin only)
@@ -171,6 +213,27 @@ func main() {
 		authUsers.GET("/:id", authUserHandler.GetByID)
 		authUsers.POST("", authUserHandler.Create)
 		authUsers.PUT("/:id", authUserHandler.Update)
+	}
+
+	// Batch Import routes (Admin only)
+	batchImport := r.Group("/api/batch-import")
+	batchImport.Use(middleware.RequireAuth())
+	batchImport.Use(middleware.RequireAdmin())
+	{
+		batchImport.POST("/preview", batchImportHandler.PreviewBatchImport)
+		batchImport.POST("/execute", batchImportHandler.ExecuteBatchImport)
+	}
+
+	// System Logs routes (Admin only)
+	logs := r.Group("/api/logs")
+	logs.Use(middleware.RequireAuth())
+	logs.Use(middleware.RequireAdmin())
+	{
+		logs.GET("", logHandler.List)
+		logs.GET("/archived", logHandler.GetArchivedLogs)
+		logs.POST("/archive", logHandler.ArchiveLogs)
+		logs.GET("/categories", logHandler.GetCategories)
+		logs.GET("/stats", logHandler.GetStats)
 	}
 
 	// Start server

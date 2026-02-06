@@ -1,5 +1,6 @@
 import apiClient from './client';
 import { EventSchedule, EventCreateDTO, EventUpdateDTO, AddStatusDTO, UpdateStatusDTO, TimeInDTO, TimeOutDTO } from '../types';
+import type { LogListResponse } from '../types/log';
 
 export const eventsApi = {
   // Get all events
@@ -80,6 +81,12 @@ export const eventsApi = {
   async removeVolunteerFromEvent(id: string, volunteerId: string): Promise<void> {
     await apiClient.delete(`/events/${id}/status/${volunteerId}`);
     console.log("removed volunteer from event:", volunteerId);
+  },
+
+  // Get logs for event (admin only)
+  async getLogs(id: string, params?: { limit?: number; offset?: number }): Promise<LogListResponse> {
+    const response = await apiClient.get<LogListResponse>(`/events/${id}/logs`, { params });
+    return response.data;
   },
 
 };

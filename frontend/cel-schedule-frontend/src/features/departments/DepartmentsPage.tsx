@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Table, Button, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { departmentsApi, volunteersApi } from '../../api';
-import { Department, DepartmentCreateDTO, MembershipInfo, Volunteer } from '../../types';
+import { Department, DepartmentCreateDTO, Volunteer } from '../../types';
 import { useAuth } from '../auth';
 import { format } from 'date-fns';
 import { DepartmentFormModal } from './modals/DepartmentFormModal';
-import { MembershipType } from '../../types/enums';
 
 const { Title } = Typography;
 
@@ -24,7 +23,8 @@ export const DepartmentsPage: React.FC = () => {
     try {
       const data = await departmentsApi.getAll();
       setDepartments(data);
-    } catch (error: any) {
+    } catch (err) {
+      console.error('Failed to load departments:', err);
       message.error('Failed to load departments');
     } finally {
       setLoading(false);
@@ -35,7 +35,8 @@ export const DepartmentsPage: React.FC = () => {
     try {
       const data = await volunteersApi.getAll();
       setVolunteers(data.filter(v => !v.isDisabled));
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to load volunteers:', err);
       message.error('Failed to load volunteers');
     }
   };
@@ -54,7 +55,8 @@ export const DepartmentsPage: React.FC = () => {
       await departmentsApi.delete(id);
       message.success('Department deleted successfully');
       fetchDepartments();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to delete department:', err);
       message.error('Failed to delete department');
     }
   };
@@ -65,9 +67,10 @@ export const DepartmentsPage: React.FC = () => {
       message.success('Department created successfully');
       setModalOpen(false);
       fetchDepartments();
-    } catch (error) {
+    } catch (err) {
+      console.error('Failed to create department:', err);
       message.error('Failed to create department');
-      throw error;
+      throw err;
     }
   };
 
@@ -82,7 +85,7 @@ export const DepartmentsPage: React.FC = () => {
       title: 'Members',
       dataIndex: 'volunteerMembers',
       key: 'members',
-      render: (members: any[]) => members?.length || 0,
+      render: (members: unknown[]) => (Array.isArray(members) ? members.length : 0),
     },
     // WIP TODO
     // {
@@ -112,7 +115,7 @@ export const DepartmentsPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: Department) => (
+      render: (_: unknown, record: Department) => (
         <Space size="small">
           <Button
             type="link"

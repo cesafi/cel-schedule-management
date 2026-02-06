@@ -154,6 +154,19 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
+	// Log OAuth login
+	logType := sub_model.OAUTH_LOGIN
+	if isNewUser {
+		logType = sub_model.USER_CREATED // New user created via OAuth
+	}
+	utils.CreateAuditLogWithUserInfo(context.Background(), h.db, logType, authUser.ID, authUser.Username, map[string]interface{}{
+		"loginMethod": "google_oauth",
+		"provider":    "google",
+		"email":       googleUser.Email,
+		"isNewUser":   isNewUser,
+		"accessLevel": int(authUser.AccessLevel),
+	})
+
 	c.JSON(http.StatusOK, dtos.OAuthLoginResponse{
 		Token:       jwtToken,
 		UserID:      authUser.ID,
@@ -253,6 +266,12 @@ func (h *OAuthHandler) LinkGoogleAccount(c *gin.Context) {
 	}
 
 	fmt.Printf("Successfully linked Google account %s to user %s\n", googleUser.Email, user.Username)
+
+	// Log Google account linking
+	utils.CreateAuditLogWithUserInfo(context.Background(), h.db, sub_model.OAUTH_LINKED, user.ID, user.Username, map[string]interface{}{
+		"provider": "google",
+		"email":    googleUser.Email,
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Google account linked successfully",

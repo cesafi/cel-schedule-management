@@ -1,5 +1,6 @@
 import apiClient from './client';
 import { Department, DepartmentCreateDTO, DepartmentUpdateDTO, AddMemberDTO, UpdateMemberDTO, StatusHistoryItem } from '../types';
+import type { LogListResponse } from '../types/log';
 
 export const departmentsApi = {
   // Get all departments
@@ -61,5 +62,11 @@ export const departmentsApi = {
   async removeMember(id: string, volunteerId: string): Promise<void> {
     await apiClient.delete(`/departments/${id}/members/${volunteerId}`);
     console.log("removed member from department:", volunteerId);
+  },
+
+  // Get logs for department (admin only)
+  async getLogs(id: string, params?: { limit?: number; offset?: number }): Promise<LogListResponse> {
+    const response = await apiClient.get<LogListResponse>(`/departments/${id}/logs`, { params });
+    return response.data;
   },
 };

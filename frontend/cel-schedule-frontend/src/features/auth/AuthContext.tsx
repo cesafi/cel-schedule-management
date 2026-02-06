@@ -16,7 +16,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isDeptHead: boolean;
   isHeadOfDepartment: (departmentId: string) => boolean;
-  canManageVolunteer: (volunteerId: string, allDepartments: Department[]) => boolean;
+  canManageVolunteer: (volunteerId: string) => boolean;
   setUser: (user: AuthUser | null) => void;
   setToken: (token: string) => void;
 }
@@ -79,7 +79,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const fullUser = await authApi.getCurrentUser();
         storage.setUser(fullUser);
         setUser(fullUser);
-      } catch (userError) {
+      } catch (err) {
+        console.error('Failed to fetch full user details:', err);
         // Fallback: construct user object from login response
         const user: AuthUser = {
           id: response.userId,
@@ -129,7 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return userDepartments.some(dept => dept.id === departmentId);
   };
 
-  const canManageVolunteer = (volunteerId: string, allDepartments: Department[]): boolean => {
+  const canManageVolunteer = (volunteerId: string): boolean => {
     if (isAdmin) return true;
     if (!isDeptHead) return false;
     
@@ -162,6 +163,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

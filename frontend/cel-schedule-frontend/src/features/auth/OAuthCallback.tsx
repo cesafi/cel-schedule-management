@@ -82,17 +82,18 @@ export const OAuthCallback: React.FC = () => {
           // Navigate to home
           navigate('/', { replace: true });
         }
-      } catch (err: any) {
-        console.error('OAuth callback error:', err);
-        console.error('Error response:', err.response?.data);
-        const errorMessage = err.response?.data?.error || 'Failed to complete Google operation';
+      } catch (err) {
+        const error = err as { response?: { data?: { error?: string } } };
+        console.error('OAuth callback error:', error);
+        console.error('Error response:', error.response?.data);
+        const errorMessage = error.response?.data?.error || 'Failed to complete Google operation';
         setError(errorMessage);
         localStorage.removeItem('oauth_action'); // Clean up
       }
     };
 
     handleCallback();
-  }, []); // Empty dependency array - run only once
+  }, [navigate, searchParams, setToken, setUser]); // Add dependencies
 
   if (error) {
     return (

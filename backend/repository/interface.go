@@ -86,11 +86,46 @@ type EventScheduleRepository interface {
 	RemoveVolunteerFromEvent(ctx context.Context, eventID string, volunteerID string) error
 }
 
+// LogRepository for system logs
+type LogRepository interface {
+	// Creates a system log entry
+	CreateLog(ctx context.Context, log *models.SystemLog) error
+	// Lists logs with pagination
+	ListLogs(ctx context.Context, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by type
+	GetLogsByType(ctx context.Context, logType sub_model.LogType, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by user who performed the action
+	GetLogsByUser(ctx context.Context, userID string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by date range
+	GetLogsByDateRange(ctx context.Context, startDate, endDate string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs with multiple filters
+	GetLogsWithFilters(ctx context.Context, logType sub_model.LogType, userID, startDate, endDate string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by volunteer ID (from metadata)
+	GetLogsByVolunteerID(ctx context.Context, volunteerID string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by event ID (from metadata)
+	GetLogsByEventID(ctx context.Context, eventID string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by department ID (from metadata)
+	GetLogsByDepartmentID(ctx context.Context, departmentID string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by category
+	GetLogsByCategory(ctx context.Context, category string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by severity level
+	GetLogsBySeverity(ctx context.Context, severity string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs by target entity (filters by metadata targetEntityId and targetEntityType)
+	GetLogsByTargetEntity(ctx context.Context, entityType, entityID string, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Archives logs older than the specified date
+	ArchiveLogsOlderThan(ctx context.Context, beforeDate string) (int, error)
+	// Gets archived logs
+	GetArchivedLogs(ctx context.Context, limit int, offset int) ([]*models.SystemLog, int, error)
+	// Gets logs with enhanced filters (supports all new filter options)
+	GetLogsWithEnhancedFilters(ctx context.Context, filters map[string]interface{}, limit int, offset int) ([]*models.SystemLog, int, error)
+}
+
 // Database interface - manages all repositories
 type Database interface {
 	Volunteers() VolunteerRepository
 	Departments() DepartmentRepository
 	AuthUsers() AuthUserRepository
 	EventSchedules() EventScheduleRepository
+	Logs() LogRepository
 	Close() error
 }

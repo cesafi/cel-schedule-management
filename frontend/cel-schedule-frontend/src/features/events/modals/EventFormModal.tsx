@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Form, Input, DatePicker, Select, Button, Space } from 'antd';
-import { EventSchedule, EventCreateDTO, Department } from '../../../types';
-import dayjs from 'dayjs';
+import { EventSchedule, EventCreateDTO, Department, EventLocation } from '../../../types';
+import { LocationInput } from '../../../components/LocationInput';
 
 const { TextArea } = Input;
 
@@ -28,7 +28,8 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
         form.setFieldsValue({
           name: event.name,
           description: event.description,
-          timeAndDate: dayjs(event.timeAndDate),
+          timeAndDate: new Date(event.timeAndDate),
+          location: event.location,
           assignedGroups: event.assignedGroups,
         });
       } else {
@@ -37,11 +38,12 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
     }
   }, [open, event, form]);
 
-  const handleFinish = async (values: any) => {
+  const handleFinish = async (values: { name: string; description: string; timeAndDate: Date; location?: EventLocation; assignedGroups?: string[] }) => {
     const data: EventCreateDTO = {
       name: values.name,
       description: values.description,
       timeAndDate: values.timeAndDate.toISOString(),
+      location: values.location,
       assignedGroups: values.assignedGroups || [],
     };
     
@@ -83,6 +85,13 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
           rules={[{ required: true, message: 'Please select date and time' }]}
         >
           <DatePicker showTime style={{ width: '100%' }} />
+        </Form.Item>
+
+        <Form.Item
+          name="location"
+          label="Location"
+        >
+          <LocationInput />
         </Form.Item>
 
         <Form.Item
