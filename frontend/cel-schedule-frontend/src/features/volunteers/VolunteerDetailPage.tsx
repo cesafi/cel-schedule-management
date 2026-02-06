@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
-import { volunteersApi } from '../../api';
-import { Volunteer, StatusHistoryItem } from '../../types';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Tabs, Row, Col } from 'antd';
+import { ArrowLeftOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FireOutlined } from '@ant-design/icons';
+import { volunteersApi, departmentsApi } from '../../api';
+import { Volunteer, StatusHistoryItem, Department, MembershipType } from '../../types';
 import { format } from 'date-fns';
+import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker } from '../../components';
+import { useVolunteerAnalytics, useUpcomingEvents, useDepartments } from '../../hooks';
+import { AttendanceType } from '../../types/enums';
 
 const { Title } = Typography;
 
@@ -14,6 +17,24 @@ export const VolunteerDetailPage: React.FC = () => {
   const [volunteer, setVolunteer] = useState<Volunteer | null>(null);
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [attendanceFilter, setAttendanceFilter] = useState<string>('ALL');
+
+  // Use analytics hooks
+  const { stats, distribution, trendData, isLoading: analyticsLoading } = useVolunteerAnalytics(id || '');
+  const { upcomingEvents, isLoading: upcomingLoading } = useUpcomingEvents({ volunteerId: id });
+  
+  // Fetch all departments to show volunteer memberships
+  const { data: departments, isLoading: deptsLoading } = useDepartments();
+  
+  // Find departments where this volunteer is a member
+  const volunteerDepartments = useMemo(() => {
+    if (!id || !departments) return [];
+    return departments.filter(dept => 
+      dept.volunteerMembers?.some(m => m.volunteerID === id)
+    );
+  }, [departments, id]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -38,6 +59,28 @@ export const VolunteerDetailPage: React.FC = () => {
     fetchData();
   }, [id]);
 
+  // Filter history by date range and attendance type - moved before early returns
+  const filteredHistory = useMemo(() => {
+    let filtered = history;
+    
+    // Filter by date range
+    if (startDate || endDate) {
+      filtered = filtered.filter(item => {
+        const itemDate = new Date(item.timeAndDate);
+        if (startDate && itemDate < new Date(startDate)) return false;
+        if (endDate && itemDate > new Date(endDate)) return false;
+        return true;
+      });
+    }
+    
+    // Filter by attendance type
+    if (attendanceFilter !== 'ALL') {
+      filtered = filtered.filter(item => item.status.attendanceType === attendanceFilter);
+    }
+    
+    return filtered;
+  }, [history, startDate, endDate, attendanceFilter]);
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}>
@@ -53,8 +96,8 @@ export const VolunteerDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'eventName',
+      key: 'eventName',
     },
     {
       title: 'Date',
@@ -73,7 +116,7 @@ export const VolunteerDetailPage: React.FC = () => {
           EXCUSED: 'blue',
           ABSENT: 'red',
         };
-        return <Tag color={colors[type] || 'default'}>{type}</Tag>;
+        return type ? <Tag color={colors[type] || 'default'}>{type}</Tag> : <Tag>Not Checked In</Tag>;
       },
     },
     {
@@ -91,11 +134,259 @@ export const VolunteerDetailPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      dataIndex: 'id',
-      render: (id:string) => (
-        <Button type="link" onClick={() => navigate(`/events/${id}`)}>
+      render: (_: unknown, record: StatusHistoryItem) => (
+        <Button type="link" onClick={() => navigate(`/events/${record.eventId}`)}>
           View Event
         </Button>
+      ),
+    },
+  ];
+
+  const departmentColumns = [
+    {
+      title: 'Department',
+      dataIndex: 'departmentName',
+      key: 'departmentName',
+      render: (name: string, record: Department) => (
+        <Button type="link" onClick={() => navigate(`/departments/${record.id}`)}>
+          {name}
+        </Button>
+      ),
+    },
+    {
+      title: 'Role',
+      key: 'role',
+      render: (_: unknown, record: Department) => {
+        const member = record.volunteerMembers?.find(m => m.volunteerID === id);
+        return member ? (
+          <Tag color={member.membershipType === MembershipType.HEAD ? 'blue' : 'default'}>
+            {member.membershipType}
+          </Tag>
+        ) : '-';
+      },
+    },
+    {
+      title: 'Joined',
+      key: 'joinedDate',
+      render: (_: unknown, record: Department) => {
+        const member = record.volunteerMembers?.find(m => m.volunteerID === id);
+        if (!member?.joinedDate) return '-';
+        try {
+          return format(new Date(member.joinedDate), 'MMM dd, yyyy');
+        } catch {
+          return '-';
+        }
+      },
+    },
+    {
+      title: 'Members',
+      key: 'memberCount',
+      render: (_: unknown, record: Department) => record.volunteerMembers?.length || 0,
+    },
+  ];
+
+  const upcomingEventsColumns = [
+    {
+      title: 'Event',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'Date',
+      dataIndex: 'timeAndDate',
+      key: 'timeAndDate',
+      render: (date: string) => format(new Date(date), 'MMM dd, yyyy HH:mm'),
+    },
+    {
+      title: 'Departments',
+      key: 'departments',
+      render: (_: unknown, record: any) => {
+        const deptNames = (record.assignedGroups || [])
+          .map((groupId: string) => {
+            const dept = (departments || []).find(d => d.id === groupId);
+            return dept?.departmentName;
+          })
+          .filter(Boolean)
+          .join(', ');
+        return deptNames || '-';
+      },
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      render: (_: unknown, record: any) => {
+        const isScheduled = record.scheduledVolunteers?.includes(id);
+        const isVoluntary = record.voluntaryVolunteers?.includes(id);
+        return (
+          <Tag color={isScheduled ? 'blue' : 'green'}>
+            {isScheduled ? 'Scheduled' : isVoluntary ? 'Voluntary' : 'Assigned'}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: unknown, record: any) => (
+        <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
+          View Event
+        </Button>
+      ),
+    },
+  ];
+
+  const tabItems = [
+    {
+      key: 'overview',
+      label: (
+        <span>
+          <LineChartOutlined /> Overview
+        </span>
+      ),
+      children: (
+        <div>
+          {/* Analytics Stats Cards */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Total Events"
+                value={stats?.totalEvents || 0}
+                icon={<CalendarOutlined />}
+                color="blue"
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Attendance Rate"
+                value={`${stats?.attendanceRate || 0}%`}
+                icon={<CheckCircleOutlined />}
+                color={stats && stats.attendanceRate >= 80 ? 'green' : stats && stats.attendanceRate >= 60 ? 'yellow' : 'red'}
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Punctuality Rate"
+                value={`${stats?.punctualityRate || 0}%`}
+                color={stats && stats.punctualityRate >= 80 ? 'green' : stats && stats.punctualityRate >= 60 ? 'yellow' : 'red'}
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Current Streak"
+                value={stats?.currentStreak || 0}
+                subtitle="Consecutive attendances"
+                icon={<FireOutlined />}
+                color="purple"
+              />
+            </Col>
+          </Row>
+
+          {/* Charts Row */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            {distribution && (
+              <Col xs={24} lg={12}>
+                <AttendancePieChart distribution={distribution} />
+              </Col>
+            )}
+            {trendData.length > 0 && (
+              <Col xs={24} lg={12}>
+                <AttendanceTrendChart data={trendData} />
+              </Col>
+            )}
+          </Row>
+
+          {/* Department Memberships Section */}
+          <Card 
+            title={
+              <span>
+                <TeamOutlined /> Department Memberships
+              </span>
+            }
+            style={{ marginBottom: 24 }}
+          >
+            {deptsLoading ? (
+              <Spin />
+            ) : volunteerDepartments.length === 0 ? (
+              <p className="text-gray-500">Not a member of any department</p>
+            ) : (
+              <Table
+                columns={departmentColumns}
+                dataSource={volunteerDepartments}
+                rowKey="id"
+                pagination={false}
+              />
+            )}
+          </Card>
+        </div>
+      ),
+    },
+    {
+      key: 'upcoming',
+      label: (
+        <span>
+          <CalendarOutlined /> Upcoming Events ({upcomingEvents.length})
+        </span>
+      ),
+      children: (
+        <Card title="Scheduled Events">
+          {upcomingLoading ? (
+            <Spin />
+          ) : upcomingEvents.length === 0 ? (
+            <p className="text-gray-500">No upcoming events scheduled</p>
+          ) : (
+            <Table
+              columns={upcomingEventsColumns}
+              dataSource={upcomingEvents}
+              rowKey="id"
+              pagination={false}
+            />
+          )}
+        </Card>
+      ),
+    },
+    {
+      key: 'history',
+      label: (
+        <span>
+          <CalendarOutlined /> Attendance History
+        </span>
+      ),
+      children: (
+        <Card title="Attendance History">
+          <div className="mb-4 space-y-4">
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              onClear={() => {
+                setStartDate('');
+                setEndDate('');
+              }}
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Filter by Type:</label>
+              <select
+                value={attendanceFilter}
+                onChange={(e) => setAttendanceFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="ALL">All</option>
+                <option value={AttendanceType.PRESENT}>Present</option>
+                <option value={AttendanceType.LATE}>Late</option>
+                <option value={AttendanceType.EXCUSED}>Excused</option>
+                <option value="ABSENT">Not Checked In</option>
+              </select>
+            </div>
+          </div>
+          <Table
+            columns={historyColumns}
+            dataSource={filteredHistory}
+            rowKey="eventId"
+            pagination={{ pageSize: 10 }}
+            locale={{ emptyText: 'No attendance records match the current filters' }}
+          />
+        </Card>
       ),
     },
   ];
@@ -119,6 +410,12 @@ export const VolunteerDetailPage: React.FC = () => {
               {volunteer.isDisabled ? 'Inactive' : 'Active'}
             </Tag>
           </Descriptions.Item>
+          <Descriptions.Item label="Department Memberships">
+            {volunteerDepartments.length}
+          </Descriptions.Item>
+          <Descriptions.Item label="Upcoming Events">
+            {upcomingEvents.length}
+          </Descriptions.Item>
           <Descriptions.Item label="Created">
             {format(new Date(volunteer.createdAt), 'MMM dd, yyyy HH:mm')}
           </Descriptions.Item>
@@ -128,13 +425,8 @@ export const VolunteerDetailPage: React.FC = () => {
         </Descriptions>
       </Card>
 
-      <Card style={{ marginTop: 24 }} title="Attendance History">
-        <Table
-          columns={historyColumns}
-          dataSource={history}
-          rowKey="eventId"
-          pagination={{ pageSize: 10 }}
-        />
+      <Card style={{ marginTop: 24 }}>
+        <Tabs defaultActiveKey="overview" items={tabItems} />
       </Card>
     </div>
   );

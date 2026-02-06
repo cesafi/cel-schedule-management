@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
 import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO } from '../../types';
 import { format } from 'date-fns';
 import { AddMemberModal } from './modals/AddMemberModal';
 import { useAuth } from '../auth';
+import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker } from '../../components';
+import { useDepartmentAnalytics, useUpcomingEvents } from '../../hooks';
+import { filterEventsByDateRange } from '../../utils/analytics';
 
 const { Title } = Typography;
 
@@ -19,6 +22,12 @@ export const DepartmentDetailPage: React.FC = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Use analytics hooks
+  const { stats, distribution, trendData, memberPerformance, isLoading: analyticsLoading } = useDepartmentAnalytics(id || '');
+  const { upcomingEvents, isLoading: upcomingLoading } = useUpcomingEvents({ departmentId: id });
 
   const fetchData = async () => {
     if (!id) return;
@@ -45,6 +54,28 @@ export const DepartmentDetailPage: React.FC = () => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]); // fetchData is stable as it doesn't use any state/props except id
+
+  // Check if user can manage this department
+  const canManage = isAdmin || (id ? isHeadOfDepartment(id) : false);
+
+  // Filter history by date range - moved before early returns
+  const filteredHistory = useMemo(() => {
+    if (!startDate && !endDate) return history;
+    
+    return history.filter(item => {
+      const itemDate = new Date(item.timeAndDate);
+      if (startDate && itemDate < new Date(startDate)) return false;
+      if (endDate && itemDate > new Date(endDate)) return false;
+      return true;
+    });
+  }, [history, startDate, endDate]);
+
+  // Available volunteers - moved before early returns
+  const availableVolunteers = useMemo(() => {
+    return volunteers.filter(
+      v => !department?.volunteerMembers?.some(m => m.volunteerID === v.id)
+    );
+  }, [volunteers, department]);
 
   const handleAddMember = async (values: AddMemberDTO) => {
     if (!id) return;
@@ -86,9 +117,6 @@ export const DepartmentDetailPage: React.FC = () => {
     return <div>Department not found</div>;
   }
 
-  // Check if user can manage this department
-  const canManage = isAdmin || (id ? isHeadOfDepartment(id) : false);
-
   const memberColumns = [
     {
       title: 'Volunteer',
@@ -96,10 +124,18 @@ export const DepartmentDetailPage: React.FC = () => {
       key: 'volunteerID',
       render: (volunteerId: string) => {
         const volunteer = volunteers.find(v => v.id === volunteerId);
+        const performance = memberPerformance.find(p => p.volunteerId === volunteerId);
         return volunteer ? (
-          <Button type="link" onClick={() => navigate(`/volunteers/${volunteerId}`)}>
-            {volunteer.name}
-          </Button>
+          <div>
+            <Button type="link" onClick={() => navigate(`/volunteers/${volunteerId}`)}>
+              {volunteer.name}
+            </Button>
+            {performance && performance.eventsAttended > 0 && (
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                {performance.eventsAttended} events
+              </div>
+            )}
+          </div>
         ) : volunteerId;
       },
     },
@@ -114,22 +150,36 @@ export const DepartmentDetailPage: React.FC = () => {
       ),
     },
     {
-      title: 'Joined',
-      dataIndex: 'joinedDate',
-      key: 'joinedDate',
-      render: (date: string) => {
-        if (!date) return '-';
-        try {
-          return format(new Date(date), 'MMM dd, yyyy');
-        } catch {
-          return '-';
-        }
+      title: 'Attendance Rate',
+      key: 'attendanceRate',
+      render: (_: unknown, record: { volunteerID: string }) => {
+        const performance = memberPerformance.find(p => p.volunteerId === record.volunteerID);
+        if (!performance || performance.eventsAttended === 0) return '-';
+        return (
+          <Tag color={performance.attendanceRate >= 80 ? 'green' : performance.attendanceRate >= 60 ? 'orange' : 'red'}>
+            {performance.attendanceRate}%
+          </Tag>
+        );
+      },
+      sorter: (a: { volunteerID: string }, b: { volunteerID: string }) => {
+        const perfA = memberPerformance.find(p => p.volunteerId === a.volunteerID);
+        const perfB = memberPerformance.find(p => p.volunteerId === b.volunteerID);
+        return (perfA?.attendanceRate || 0) - (perfB?.attendanceRate || 0);
       },
     },
     {
-      title: 'Last Updated',
-      dataIndex: 'lastUpdated',
-      key: 'lastUpdated',
+      title: 'Punctuality Rate',
+      key: 'punctualityRate',
+      render: (_: unknown, record: { volunteerID: string }) => {
+        const performance = memberPerformance.find(p => p.volunteerId === record.volunteerID);
+        if (!performance || performance.eventsAttended === 0) return '-';
+        return `${performance.punctualityRate}%`;
+      },
+    },
+    {
+      title: 'Joined',
+      dataIndex: 'joinedDate',
+      key: 'joinedDate',
       render: (date: string) => {
         if (!date) return '-';
         try {
@@ -164,7 +214,7 @@ export const DepartmentDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'name',
+      dataIndex: 'eventName',
       key: 'eventName',
     },
     {
@@ -184,9 +234,180 @@ export const DepartmentDetailPage: React.FC = () => {
     },
   ];
 
-  const availableVolunteers = volunteers.filter(
-    v => !department.volunteerMembers?.some(m => m.volunteerID === v.id)
-  );
+  const upcomingEventsColumns = [
+    {
+      title: 'Event',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'Date',
+      dataIndex: 'timeAndDate',
+      key: 'timeAndDate',
+      render: (date: string) => format(new Date(date), 'MMM dd, yyyy HH:mm'),
+    },
+    {
+      title: 'Scheduled Members',
+      key: 'scheduledCount',
+      render: (_: unknown, record: any) => {
+        const deptMembers = department.volunteerMembers?.map(m => m.volunteerID) || [];
+        const scheduled = (record.scheduledVolunteers || []).filter((v: string) => deptMembers.includes(v));
+        return `${scheduled.length} / ${deptMembers.length}`;
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: unknown, record: any) => (
+        <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
+          View Event
+        </Button>
+      ),
+    },
+  ];
+
+  const tabItems = [
+    {
+      key: 'overview',
+      label: (
+        <span>
+          <LineChartOutlined /> Overview
+        </span>
+      ),
+      children: (
+        <div>
+          {/* Analytics Stats Cards */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Total Events"
+                value={stats?.totalEvents || 0}
+                icon={<CalendarOutlined />}
+                color="blue"
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Active Members"
+                value={`${stats?.activeMembers || 0} / ${stats?.totalMembers || 0}`}
+                subtitle="Last 30 days"
+                icon={<TeamOutlined />}
+                color="green"
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Attendance Rate"
+                value={`${stats?.attendanceRate || 0}%`}
+                icon={<CheckCircleOutlined />}
+                color={stats && stats.attendanceRate >= 80 ? 'green' : stats && stats.attendanceRate >= 60 ? 'yellow' : 'red'}
+              />
+            </Col>
+            <Col xs={24} sm={12} lg={6}>
+              <StatsCard
+                title="Punctuality Score"
+                value={`${stats?.punctualityRate || 0}%`}
+                color={stats && stats.punctualityRate >= 80 ? 'green' : stats && stats.punctualityRate >= 60 ? 'yellow' : 'red'}
+              />
+            </Col>
+          </Row>
+
+          {/* Charts Row */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            {distribution && (
+              <Col xs={24} lg={12}>
+                <AttendancePieChart distribution={distribution} />
+              </Col>
+            )}
+            {trendData.length > 0 && (
+              <Col xs={24} lg={12}>
+                <AttendanceTrendChart data={trendData} />
+              </Col>
+            )}
+          </Row>
+
+          {/* Upcoming Events Section */}
+          <Card 
+            title={
+              <span>
+                <CalendarOutlined /> Upcoming Events
+              </span>
+            }
+            className="mb-6"
+          >
+            {upcomingLoading ? (
+              <Spin />
+            ) : upcomingEvents.length === 0 ? (
+              <p className="text-gray-500">No upcoming events assigned to this department</p>
+            ) : (
+              <Table
+                columns={upcomingEventsColumns}
+                dataSource={upcomingEvents}
+                rowKey="id"
+                pagination={false}
+              />
+            )}
+          </Card>
+        </div>
+      ),
+    },
+    {
+      key: 'members',
+      label: (
+        <span>
+          <TeamOutlined /> Members
+        </span>
+      ),
+      children: (
+        <Card
+          title="Department Members"
+          extra={
+            canManage && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+                Add Member
+              </Button>
+            )
+          }
+        >
+          <Table
+            columns={memberColumns}
+            dataSource={department.volunteerMembers}
+            rowKey="volunteerID"
+            pagination={{ pageSize: 10 }}
+          />
+        </Card>
+      ),
+    },
+    {
+      key: 'history',
+      label: (
+        <span>
+          <CalendarOutlined /> Event History
+        </span>
+      ),
+      children: (
+        <Card title="Event History">
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onClear={() => {
+              setStartDate('');
+              setEndDate('');
+            }}
+          />
+          <Table
+            style={{ marginTop: 16 }}
+            columns={historyColumns}
+            dataSource={filteredHistory}
+            rowKey="eventId"
+            pagination={{ pageSize: 10 }}
+          />
+        </Card>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -230,32 +451,8 @@ export const DepartmentDetailPage: React.FC = () => {
         </Descriptions>
       </Card>
 
-      <Card 
-        style={{ marginTop: 24 }} 
-        title="Members"
-        extra={
-          canManage && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-              Add Member
-            </Button>
-          )
-        }
-      >
-        <Table
-          columns={memberColumns}
-          dataSource={department.volunteerMembers}
-          rowKey="volunteerID"
-          pagination={false}
-        />
-      </Card>
-
-      <Card style={{ marginTop: 24 }} title="Event History">
-        <Table
-          columns={historyColumns}
-          dataSource={history}
-          rowKey="eventId"
-          pagination={{ pageSize: 10 }}
-        />
+      <Card style={{ marginTop: 24 }}>
+        <Tabs defaultActiveKey="overview" items={tabItems} />
       </Card>
 
       <AddMemberModal
