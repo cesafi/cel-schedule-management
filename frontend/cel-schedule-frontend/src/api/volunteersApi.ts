@@ -1,5 +1,6 @@
 import apiClient from './client';
 import { Volunteer, VolunteerCreateDTO, VolunteerUpdateDTO, StatusHistoryItem } from '../types';
+import type { LogListResponse } from '../types/log';
 
 export const volunteersApi = {
   // Get all volunteers
@@ -36,5 +37,11 @@ export const volunteersApi = {
   // Delete volunteer (soft delete)
   async delete(id: string): Promise<void> {
     await apiClient.delete(`/volunteers/${id}`);
+  },
+
+  // Get logs for volunteer (admin only)
+  async getLogs(id: string, params?: { limit?: number; offset?: number }): Promise<LogListResponse> {
+    const response = await apiClient.get<LogListResponse>(`/volunteers/${id}/logs`, { params });
+    return response.data;
   },
 };

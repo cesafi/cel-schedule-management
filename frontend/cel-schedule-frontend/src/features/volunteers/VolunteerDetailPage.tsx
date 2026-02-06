@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Tabs, Row, Col } from 'antd';
-import { ArrowLeftOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FireOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FireOutlined, FileTextOutlined } from '@ant-design/icons';
 import { volunteersApi, departmentsApi } from '../../api';
 import { Volunteer, StatusHistoryItem, Department, MembershipType } from '../../types';
 import { format } from 'date-fns';
-import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker } from '../../components';
-import { useVolunteerAnalytics, useUpcomingEvents, useDepartments } from '../../hooks';
+import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
+import { useVolunteerAnalytics, useUpcomingEvents, useDepartments, useEntityLogs } from '../../hooks';
+import { useAuth } from '../auth/AuthContext';
 import { AttendanceType } from '../../types/enums';
 
 const { Title } = Typography;
@@ -14,12 +15,15 @@ const { Title } = Typography;
 export const VolunteerDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [volunteer, setVolunteer] = useState<Volunteer | null>(null);
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [attendanceFilter, setAttendanceFilter] = useState<string>('ALL');
+  const [logPage, setLogPage] = useState(1);
+  const logPageSize = 20;
 
   // Use analytics hooks
   const { stats, distribution, trendData, isLoading: analyticsLoading } = useVolunteerAnalytics(id || '');
@@ -27,6 +31,17 @@ export const VolunteerDetailPage: React.FC = () => {
   
   // Fetch all departments to show volunteer memberships
   const { data: departments, isLoading: deptsLoading } = useDepartments();
+  
+  // Fetch logs for admin users only
+  const { data: logsData, isLoading: logsLoading } = useEntityLogs(
+    'volunteer',
+    id || '',
+    { 
+      limit: logPageSize, 
+      offset: (logPage - 1) * logPageSize,
+      enabled: isAdmin && !!id 
+    }
+  );
   
   // Find departments where this volunteer is a member
   const volunteerDepartments = useMemo(() => {
@@ -389,6 +404,32 @@ export const VolunteerDetailPage: React.FC = () => {
         </Card>
       ),
     },
+    ...(isAdmin ? [{
+      key: 'logs',
+      label: (
+        <span>
+          <FileTextOutlined /> Activity Log
+        </span>
+      ),
+      children: (
+        <Card title="System Activity Log">
+          {logsLoading ? (
+            <Spin />
+          ) : (
+            <LogsTable
+              logs={logsData?.logs || []}
+              loading={logsLoading}
+              pagination={{
+                current: logPage,
+                pageSize: logPageSize,
+                total: logsData?.total || 0,
+                onChange: (page) => setLogPage(page),
+              }}
+            />
+          )}
+        </Card>
+      ),
+    }] : []),
   ];
 
   return (

@@ -3,6 +3,7 @@ package firebase
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"sheduling-server/models"
@@ -306,41 +307,42 @@ func (r *logRepo) GetLogsByVolunteerID(ctx context.Context, volunteerID string, 
 		limit = 50
 	}
 
-	totalDocs, err := r.firestore.Collection(logsCollection).
+	// Fetch all documents with the volunteer ID (avoid composite index requirement)
+	docs, err := r.firestore.Collection(logsCollection).
 		Where("Metadata.volunteerId", "==", volunteerID).
 		Documents(ctx).GetAll()
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+		return nil, 0, fmt.Errorf("failed to get logs: %v", err)
 	}
-	totalCount := len(totalDocs)
 
-	query := r.firestore.Collection(logsCollection).
-		Where("Metadata.volunteerId", "==", volunteerID).
-		OrderBy("TimeDetected", firestore.Desc).
-		Offset(offset).
-		Limit(limit)
-
-	iter := query.Documents(ctx)
-	defer iter.Stop()
-
-	var logs []*models.SystemLog
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
-		}
-
+	// Convert to SystemLog objects
+	var allLogs []*models.SystemLog
+	for _, doc := range docs {
 		var log models.SystemLog
 		if err := doc.DataTo(&log); err != nil {
-			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+			continue // Skip invalid documents
 		}
-		logs = append(logs, &log)
+		allLogs = append(allLogs, &log)
 	}
 
-	return logs, totalCount, nil
+	// Sort by TimeDetected in descending order (newest first)
+	sort.Slice(allLogs, func(i, j int) bool {
+		return allLogs[i].TimeDetected.After(allLogs[j].TimeDetected)
+	})
+
+	totalCount := len(allLogs)
+
+	// Apply offset and limit in memory
+	if offset >= len(allLogs) {
+		return []*models.SystemLog{}, totalCount, nil
+	}
+
+	end := offset + limit
+	if end > len(allLogs) {
+		end = len(allLogs)
+	}
+
+	return allLogs[offset:end], totalCount, nil
 }
 
 // GetLogsByEventID retrieves logs filtered by event ID from metadata
@@ -349,41 +351,42 @@ func (r *logRepo) GetLogsByEventID(ctx context.Context, eventID string, limit in
 		limit = 50
 	}
 
-	totalDocs, err := r.firestore.Collection(logsCollection).
+	// Fetch all documents with the event ID (avoid composite index requirement)
+	docs, err := r.firestore.Collection(logsCollection).
 		Where("Metadata.eventId", "==", eventID).
 		Documents(ctx).GetAll()
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+		return nil, 0, fmt.Errorf("failed to get logs: %v", err)
 	}
-	totalCount := len(totalDocs)
 
-	query := r.firestore.Collection(logsCollection).
-		Where("Metadata.eventId", "==", eventID).
-		OrderBy("TimeDetected", firestore.Desc).
-		Offset(offset).
-		Limit(limit)
-
-	iter := query.Documents(ctx)
-	defer iter.Stop()
-
-	var logs []*models.SystemLog
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
-		}
-
+	// Convert to SystemLog objects
+	var allLogs []*models.SystemLog
+	for _, doc := range docs {
 		var log models.SystemLog
 		if err := doc.DataTo(&log); err != nil {
-			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+			continue // Skip invalid documents
 		}
-		logs = append(logs, &log)
+		allLogs = append(allLogs, &log)
 	}
 
-	return logs, totalCount, nil
+	// Sort by TimeDetected in descending order (newest first)
+	sort.Slice(allLogs, func(i, j int) bool {
+		return allLogs[i].TimeDetected.After(allLogs[j].TimeDetected)
+	})
+
+	totalCount := len(allLogs)
+
+	// Apply offset and limit in memory
+	if offset >= len(allLogs) {
+		return []*models.SystemLog{}, totalCount, nil
+	}
+
+	end := offset + limit
+	if end > len(allLogs) {
+		end = len(allLogs)
+	}
+
+	return allLogs[offset:end], totalCount, nil
 }
 
 // GetLogsByDepartmentID retrieves logs filtered by department ID from metadata
@@ -392,41 +395,42 @@ func (r *logRepo) GetLogsByDepartmentID(ctx context.Context, departmentID string
 		limit = 50
 	}
 
-	totalDocs, err := r.firestore.Collection(logsCollection).
+	// Fetch all documents with the department ID (avoid composite index requirement)
+	docs, err := r.firestore.Collection(logsCollection).
 		Where("Metadata.departmentId", "==", departmentID).
 		Documents(ctx).GetAll()
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+		return nil, 0, fmt.Errorf("failed to get logs: %v", err)
 	}
-	totalCount := len(totalDocs)
 
-	query := r.firestore.Collection(logsCollection).
-		Where("Metadata.departmentId", "==", departmentID).
-		OrderBy("TimeDetected", firestore.Desc).
-		Offset(offset).
-		Limit(limit)
-
-	iter := query.Documents(ctx)
-	defer iter.Stop()
-
-	var logs []*models.SystemLog
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
-		}
-
+	// Convert to SystemLog objects
+	var allLogs []*models.SystemLog
+	for _, doc := range docs {
 		var log models.SystemLog
 		if err := doc.DataTo(&log); err != nil {
-			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+			continue // Skip invalid documents
 		}
-		logs = append(logs, &log)
+		allLogs = append(allLogs, &log)
 	}
 
-	return logs, totalCount, nil
+	// Sort by TimeDetected in descending order (newest first)
+	sort.Slice(allLogs, func(i, j int) bool {
+		return allLogs[i].TimeDetected.After(allLogs[j].TimeDetected)
+	})
+
+	totalCount := len(allLogs)
+
+	// Apply offset and limit in memory
+	if offset >= len(allLogs) {
+		return []*models.SystemLog{}, totalCount, nil
+	}
+
+	end := offset + limit
+	if end > len(allLogs) {
+		end = len(allLogs)
+	}
+
+	return allLogs[offset:end], totalCount, nil
 }
 
 // GetLogsByCategory retrieves logs filtered by category

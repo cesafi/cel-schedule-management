@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined } from '@ant-design/icons';
 import { eventsApi } from '../../api';
 import { EventSchedule, Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
@@ -9,9 +9,10 @@ import { format } from 'date-fns';
 import { useAuth } from '../auth';
 import { AddVolunteerToEventModal } from './modals/AddVolunteerToEventModal';
 import { AddDepartmentToEventModal } from './modals/AddDepartmentToEventModal';
-import { useEvent, useVolunteers, useDepartments, useVolunteerMap, useDepartmentMap } from '../../hooks';
+import { useEvent, useVolunteers, useDepartments, useVolunteerMap, useDepartmentMap, useEntityLogs } from '../../hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { eventKeys } from '../../hooks/useEvents';
+import { LogsTable } from '../../components';
 
 const { Title } = Typography;
 
@@ -28,6 +29,8 @@ export const EventDetailPage: React.FC = () => {
   const [timeInForm] = Form.useForm();
   const [timeOutForm] = Form.useForm();
   const [filterDepartment, setFilterDepartment] = useState<string | null>(null);
+  const [logPage, setLogPage] = useState(1);
+  const logPageSize = 20;
   const [filterTimeIn, setFilterTimeIn] = useState<string | null>(null);
   const [filterTimeOut, setFilterTimeOut] = useState<string | null>(null);
 
@@ -39,6 +42,17 @@ export const EventDetailPage: React.FC = () => {
   // Create maps for O(1) lookups
   const { volunteerMap } = useVolunteerMap(true);
   const { departmentMap } = useDepartmentMap(true);
+
+  // Fetch entity logs (admin only)
+  const { data: logsData, isLoading: logsLoading } = useEntityLogs(
+    'event',
+    id || '',
+    {
+      limit: logPageSize,
+      offset: (logPage - 1) * logPageSize,
+      enabled: isAdmin && !!id
+    }
+  );
 
   const loading = eventLoading || volunteersLoading || departmentsLoading;
 
@@ -689,7 +703,29 @@ export const EventDetailPage: React.FC = () => {
                   />
                 </>
               ),
-            }
+            },
+            ...(isAdmin ? [{
+              key: 'logs',
+              label: (
+                <span>
+                  <FileTextOutlined /> Activity Log
+                </span>
+              ),
+              children: (
+                <Card title="System Activity Log">
+                  <LogsTable
+                    logs={logsData?.logs || []}
+                    loading={logsLoading}
+                    pagination={{
+                      current: logPage,
+                      pageSize: logPageSize,
+                      total: logsData?.total || 0,
+                      onChange: setLogPage,
+                    }}
+                  />
+                </Card>
+              ),
+            }] : [])
           ]}
         />
       </Card>

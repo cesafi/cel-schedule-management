@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
 import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO } from '../../types';
 import { format } from 'date-fns';
 import { AddMemberModal } from './modals/AddMemberModal';
 import { useAuth } from '../auth';
-import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker } from '../../components';
-import { useDepartmentAnalytics, useUpcomingEvents } from '../../hooks';
+import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
+import { useDepartmentAnalytics, useUpcomingEvents, useEntityLogs } from '../../hooks';
 import { filterEventsByDateRange } from '../../utils/analytics';
 
 const { Title } = Typography;
@@ -24,10 +24,23 @@ export const DepartmentDetailPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [logPage, setLogPage] = useState(1);
+  const logPageSize = 20;
 
   // Use analytics hooks
   const { stats, distribution, trendData, memberPerformance, isLoading: analyticsLoading } = useDepartmentAnalytics(id || '');
   const { upcomingEvents, isLoading: upcomingLoading } = useUpcomingEvents({ departmentId: id });
+  
+  // Fetch logs for admin users only
+  const { data: logsData, isLoading: logsLoading } = useEntityLogs(
+    'department',
+    id || '',
+    { 
+      limit: logPageSize, 
+      offset: (logPage - 1) * logPageSize,
+      enabled: isAdmin && !!id 
+    }
+  );
 
   const fetchData = async () => {
     if (!id) return;
@@ -407,6 +420,32 @@ export const DepartmentDetailPage: React.FC = () => {
         </Card>
       ),
     },
+    ...(isAdmin ? [{
+      key: 'logs',
+      label: (
+        <span>
+          <FileTextOutlined /> Activity Log
+        </span>
+      ),
+      children: (
+        <Card title="System Activity Log">
+          {logsLoading ? (
+            <Spin />
+          ) : (
+            <LogsTable
+              logs={logsData?.logs || []}
+              loading={logsLoading}
+              pagination={{
+                current: logPage,
+                pageSize: logPageSize,
+                total: logsData?.total || 0,
+                onChange: (page) => setLogPage(page),
+              }}
+            />
+          )}
+        </Card>
+      ),
+    }] : []),
   ];
 
   return (
