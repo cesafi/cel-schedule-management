@@ -115,3 +115,144 @@ func SafeLog(c *gin.Context, db repository.Database, logType sub_model.LogType, 
 	}
 	return true
 }
+
+// CreateLogWithSeverity creates a log with automatic category and specified severity
+func CreateLogWithSeverity(ctx context.Context, db repository.Database, logType sub_model.LogType, severity string, metadata map[string]interface{}) error {
+	systemLog := &models.SystemLog{
+		ID:           uuid.New().String(),
+		TimeDetected: time.Now(),
+		Type:         logType,
+		Metadata:     metadata,
+		LastUpdated:  time.Now(),
+		Category:     sub_model.GetLogTypeCategory(logType),
+		Severity:     severity,
+		IsArchived:   false,
+		ArchiveDate:  nil,
+	}
+
+	err := db.Logs().CreateLog(ctx, systemLog)
+	if err != nil {
+		log.Printf("WARNING: Failed to create log (type: %s): %v", logType, err)
+		return err
+	}
+
+	return nil
+}
+
+// CreateAttendanceLog creates a log for attendance operations with standard metadata
+func CreateAttendanceLog(c *gin.Context, db repository.Database, logType sub_model.LogType, eventID, eventName, volunteerID, volunteerName string, additionalMetadata map[string]interface{}) error {
+	metadata := map[string]interface{}{
+		sub_model.META_EVENT_ID:       eventID,
+		sub_model.META_EVENT_NAME:     eventName,
+		sub_model.META_VOLUNTEER_ID:   volunteerID,
+		sub_model.META_VOLUNTEER_NAME: volunteerName,
+	}
+
+	// Merge additional metadata
+	for k, v := range additionalMetadata {
+		metadata[k] = v
+	}
+
+	// Extract user info from context
+	userID, exists := c.Get("userID")
+	if exists {
+		metadata[sub_model.META_USER_ID] = userID
+	}
+
+	username, exists := c.Get("username")
+	if exists {
+		metadata[sub_model.META_USERNAME] = username
+	}
+
+	systemLog := &models.SystemLog{
+		ID:           uuid.New().String(),
+		TimeDetected: time.Now(),
+		Type:         logType,
+		Metadata:     metadata,
+		LastUpdated:  time.Now(),
+		Category:     sub_model.GetLogTypeCategory(logType),
+		Severity:     sub_model.SEVERITY_INFO,
+		IsArchived:   false,
+		ArchiveDate:  nil,
+	}
+
+	err := db.Logs().CreateLog(c.Request.Context(), systemLog)
+	if err != nil {
+		log.Printf("WARNING: Failed to create attendance log (type: %s): %v", logType, err)
+		return err
+	}
+
+	return nil
+}
+
+// CreateEntityChangeLog creates a log for entity updates with a changes object
+func CreateEntityChangeLog(c *gin.Context, db repository.Database, logType sub_model.LogType, entityID string, changes map[string]interface{}) error {
+	metadata := map[string]interface{}{
+		sub_model.META_CHANGES: changes,
+	}
+
+	// Extract user info from context
+	userID, exists := c.Get("userID")
+	if exists {
+		metadata[sub_model.META_USER_ID] = userID
+	}
+
+	username, exists := c.Get("username")
+	if exists {
+		metadata[sub_model.META_USERNAME] = username
+	}
+
+	systemLog := &models.SystemLog{
+		ID:           uuid.New().String(),
+		TimeDetected: time.Now(),
+		Type:         logType,
+		Metadata:     metadata,
+		LastUpdated:  time.Now(),
+		Category:     sub_model.GetLogTypeCategory(logType),
+		Severity:     sub_model.SEVERITY_INFO,
+		IsArchived:   false,
+		ArchiveDate:  nil,
+	}
+
+	err := db.Logs().CreateLog(c.Request.Context(), systemLog)
+	if err != nil {
+		log.Printf("WARNING: Failed to create entity change log (type: %s): %v", logType, err)
+		return err
+	}
+
+	return nil
+}
+
+// CreateEnhancedLog creates a log with all enhanced fields (category, severity, archived status)
+func CreateEnhancedLog(c *gin.Context, db repository.Database, logType sub_model.LogType, severity string, metadata map[string]interface{}) error {
+	// Extract user info from context
+	userID, exists := c.Get("userID")
+	if exists {
+		metadata[sub_model.META_USER_ID] = userID
+	}
+
+	username, exists := c.Get("username")
+	if exists {
+		metadata[sub_model.META_USERNAME] = username
+	}
+
+	systemLog := &models.SystemLog{
+		ID:           uuid.New().String(),
+		TimeDetected: time.Now(),
+		Type:         logType,
+		Metadata:     metadata,
+		LastUpdated:  time.Now(),
+		Category:     sub_model.GetLogTypeCategory(logType),
+		Severity:     severity,
+		IsArchived:   false,
+		ArchiveDate:  nil,
+	}
+
+	err := db.Logs().CreateLog(c.Request.Context(), systemLog)
+	if err != nil {
+		log.Printf("WARNING: Failed to create enhanced log (type: %s): %v", logType, err)
+		return err
+	}
+
+	return nil
+}

@@ -8,6 +8,7 @@ import (
 	"sheduling-server/models"
 	sub_model "sheduling-server/models/sub_models"
 	"sheduling-server/repository"
+	"sheduling-server/utils"
 	"strings"
 	"sync"
 	"time"
@@ -122,6 +123,16 @@ func (h *BatchImportHandler) PreviewBatchImport(c *gin.Context) {
 	h.sessions[sessionID] = session
 	h.mu.Unlock()
 
+	// Log batch import started
+	utils.CreateEnhancedLog(c, h.db, sub_model.BATCH_IMPORT_STARTED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_FILE_NAME: file.Filename,
+		sub_model.META_FILE_SIZE: file.Size,
+		sub_model.META_ROW_COUNT: len(rows),
+		"sessionId":              sessionID,
+		"totalVolunteers":        len(volunteerMap),
+		"totalDepartments":       len(departments),
+	})
+
 	response := dtos.BatchImportPreviewResponse{
 		Departments:      departments,
 		Conflicts:        conflicts,
@@ -163,6 +174,12 @@ func (h *BatchImportHandler) ExecuteBatchImport(c *gin.Context) {
 	// Create volunteers first
 	volunteerIDMap, volunteersCreated, volunteersReused, err := h.createVolunteers(ctx, session.Departments, resolutionMap)
 	if err != nil {
+		// Log batch import failure
+		utils.CreateEnhancedLog(c, h.db, sub_model.BATCH_IMPORT_FAILED, sub_model.SEVERITY_ERROR, map[string]interface{}{
+			sub_model.META_ERROR_MESSAGE: err.Error(),
+			"sessionId":                  request.SessionID,
+			"stage":                      "volunteer_creation",
+		})
 		c.JSON(http.StatusInternalServerError, dtos.BatchImportExecuteResponse{
 			Success:      false,
 			ErrorMessage: "Failed to create volunteers: " + err.Error(),
@@ -173,6 +190,13 @@ func (h *BatchImportHandler) ExecuteBatchImport(c *gin.Context) {
 	// Create departments with member references
 	departmentIDs, err := h.createDepartments(ctx, session.Departments, volunteerIDMap)
 	if err != nil {
+		// Log batch import failure
+		utils.CreateEnhancedLog(c, h.db, sub_model.BATCH_IMPORT_FAILED, sub_model.SEVERITY_ERROR, map[string]interface{}{
+			sub_model.META_ERROR_MESSAGE: err.Error(),
+			"sessionId":                  request.SessionID,
+			"stage":                      "department_creation",
+			sub_model.META_SUCCESS_COUNT: volunteersCreated,
+		})
 		c.JSON(http.StatusInternalServerError, dtos.BatchImportExecuteResponse{
 			Success:      false,
 			ErrorMessage: "Failed to create departments: " + err.Error(),
@@ -184,6 +208,17 @@ func (h *BatchImportHandler) ExecuteBatchImport(c *gin.Context) {
 	h.mu.Lock()
 	delete(h.sessions, request.SessionID)
 	h.mu.Unlock()
+
+	// Log successful batch import completion
+	utils.CreateEnhancedLog(c, h.db, sub_model.BATCH_IMPORT_COMPLETED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_SUCCESS_COUNT:       volunteersCreated + len(departmentIDs),
+		"sessionId":                        request.SessionID,
+		"volunteersCreated":                volunteersCreated,
+		"volunteersReused":                 volunteersReused,
+		"departmentsCreated":               len(departmentIDs),
+		sub_model.META_CREATED_VOLUNTEERS:  volunteersCreated,
+		sub_model.META_CREATED_DEPARTMENTS: len(departmentIDs),
+	})
 
 	c.JSON(http.StatusOK, dtos.BatchImportExecuteResponse{
 		Success:              true,

@@ -299,3 +299,494 @@ func (r *logRepo) GetLogsWithFilters(ctx context.Context, logType sub_model.LogT
 
 	return logs, totalCount, nil
 }
+
+// GetLogsByVolunteerID retrieves logs filtered by volunteer ID from metadata
+func (r *logRepo) GetLogsByVolunteerID(ctx context.Context, volunteerID string, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	totalDocs, err := r.firestore.Collection(logsCollection).
+		Where("Metadata.volunteerId", "==", volunteerID).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+	}
+	totalCount := len(totalDocs)
+
+	query := r.firestore.Collection(logsCollection).
+		Where("Metadata.volunteerId", "==", volunteerID).
+		OrderBy("TimeDetected", firestore.Desc).
+		Offset(offset).
+		Limit(limit)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var logs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, totalCount, nil
+}
+
+// GetLogsByEventID retrieves logs filtered by event ID from metadata
+func (r *logRepo) GetLogsByEventID(ctx context.Context, eventID string, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	totalDocs, err := r.firestore.Collection(logsCollection).
+		Where("Metadata.eventId", "==", eventID).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+	}
+	totalCount := len(totalDocs)
+
+	query := r.firestore.Collection(logsCollection).
+		Where("Metadata.eventId", "==", eventID).
+		OrderBy("TimeDetected", firestore.Desc).
+		Offset(offset).
+		Limit(limit)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var logs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, totalCount, nil
+}
+
+// GetLogsByDepartmentID retrieves logs filtered by department ID from metadata
+func (r *logRepo) GetLogsByDepartmentID(ctx context.Context, departmentID string, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	totalDocs, err := r.firestore.Collection(logsCollection).
+		Where("Metadata.departmentId", "==", departmentID).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+	}
+	totalCount := len(totalDocs)
+
+	query := r.firestore.Collection(logsCollection).
+		Where("Metadata.departmentId", "==", departmentID).
+		OrderBy("TimeDetected", firestore.Desc).
+		Offset(offset).
+		Limit(limit)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var logs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, totalCount, nil
+}
+
+// GetLogsByCategory retrieves logs filtered by category
+func (r *logRepo) GetLogsByCategory(ctx context.Context, category string, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	totalDocs, err := r.firestore.Collection(logsCollection).
+		Where("Category", "==", category).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+	}
+	totalCount := len(totalDocs)
+
+	query := r.firestore.Collection(logsCollection).
+		Where("Category", "==", category).
+		OrderBy("TimeDetected", firestore.Desc).
+		Offset(offset).
+		Limit(limit)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var logs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, totalCount, nil
+}
+
+// GetLogsBySeverity retrieves logs filtered by severity level
+func (r *logRepo) GetLogsBySeverity(ctx context.Context, severity string, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	totalDocs, err := r.firestore.Collection(logsCollection).
+		Where("Severity", "==", severity).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+	}
+	totalCount := len(totalDocs)
+
+	query := r.firestore.Collection(logsCollection).
+		Where("Severity", "==", severity).
+		OrderBy("TimeDetected", firestore.Desc).
+		Offset(offset).
+		Limit(limit)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var logs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, totalCount, nil
+}
+
+// GetLogsByTargetEntity retrieves logs by target entity (from metadata)
+func (r *logRepo) GetLogsByTargetEntity(ctx context.Context, entityType, entityID string, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	var metadataKey string
+	switch entityType {
+	case "volunteer":
+		metadataKey = "Metadata.volunteerId"
+	case "event":
+		metadataKey = "Metadata.eventId"
+	case "department":
+		metadataKey = "Metadata.departmentId"
+	case "user":
+		metadataKey = "Metadata.targetUserId"
+	default:
+		return nil, 0, fmt.Errorf("invalid entity type: %s", entityType)
+	}
+
+	totalDocs, err := r.firestore.Collection(logsCollection).
+		Where(metadataKey, "==", entityID).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+	}
+	totalCount := len(totalDocs)
+
+	query := r.firestore.Collection(logsCollection).
+		Where(metadataKey, "==", entityID).
+		OrderBy("TimeDetected", firestore.Desc).
+		Offset(offset).
+		Limit(limit)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var logs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, totalCount, nil
+}
+
+// ArchiveLogsOlderThan archives logs older than the specified date
+func (r *logRepo) ArchiveLogsOlderThan(ctx context.Context, beforeDate string) (int, error) {
+	date, err := time.Parse(time.RFC3339, beforeDate)
+	if err != nil {
+		return 0, fmt.Errorf("invalid date format: %v", err)
+	}
+
+	query := r.firestore.Collection(logsCollection).
+		Where("TimeDetected", "<", date).
+		Where("IsArchived", "==", false)
+
+	docs, err := query.Documents(ctx).GetAll()
+	if err != nil {
+		return 0, fmt.Errorf("failed to query logs: %v", err)
+	}
+
+	archiveDate := time.Now()
+	archivedCount := 0
+
+	batch := r.firestore.Batch()
+	for i, doc := range docs {
+		batch.Update(doc.Ref, []firestore.Update{
+			{Path: "IsArchived", Value: true},
+			{Path: "ArchiveDate", Value: archiveDate},
+			{Path: "LastUpdated", Value: archiveDate},
+		})
+
+		if (i+1)%500 == 0 {
+			_, err := batch.Commit(ctx)
+			if err != nil {
+				return archivedCount, fmt.Errorf("failed to commit batch: %v", err)
+			}
+			batch = r.firestore.Batch()
+		}
+		archivedCount++
+	}
+
+	if archivedCount%500 != 0 {
+		_, err := batch.Commit(ctx)
+		if err != nil {
+			return archivedCount, fmt.Errorf("failed to commit final batch: %v", err)
+		}
+	}
+
+	return archivedCount, nil
+}
+
+// GetArchivedLogs retrieves logs that have been archived
+func (r *logRepo) GetArchivedLogs(ctx context.Context, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	totalDocs, err := r.firestore.Collection(logsCollection).
+		Where("IsArchived", "==", true).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get total count: %v", err)
+	}
+	totalCount := len(totalDocs)
+
+	query := r.firestore.Collection(logsCollection).
+		Where("IsArchived", "==", true).
+		OrderBy("ArchiveDate", firestore.Desc).
+		Offset(offset).
+		Limit(limit)
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var logs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, totalCount, nil
+}
+
+// GetLogsWithEnhancedFilters retrieves logs with comprehensive filter support
+func (r *logRepo) GetLogsWithEnhancedFilters(ctx context.Context, filters map[string]interface{}, limit int, offset int) ([]*models.SystemLog, int, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	// Start with base query - just order by TimeDetected to avoid index requirements
+	query := r.firestore.Collection(logsCollection).OrderBy("TimeDetected", firestore.Desc)
+
+	// We'll apply most filters in memory to avoid Firestore composite index requirements
+	// Only apply simple filters that don't require indexes when combined with OrderBy
+
+	// Execute query with pagination
+	query = query.Offset(offset).Limit(limit * 2) // Fetch more to account for filtering
+
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	var allLogs []*models.SystemLog
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to iterate logs: %v", err)
+		}
+
+		var log models.SystemLog
+		if err := doc.DataTo(&log); err != nil {
+			return nil, 0, fmt.Errorf("failed to convert log data: %v", err)
+		}
+		allLogs = append(allLogs, &log)
+	}
+
+	// Apply all filters in memory
+	includeArchived, _ := filters["includeArchived"].(bool)
+	logTypeFilter, _ := filters["type"].(string)
+	categoryFilter, _ := filters["category"].(string)
+	severityFilter, _ := filters["severity"].(string)
+	userIDFilter, _ := filters["userId"].(string)
+	volunteerIDFilter, _ := filters["volunteerId"].(string)
+	eventIDFilter, _ := filters["eventId"].(string)
+	departmentIDFilter, _ := filters["departmentId"].(string)
+
+	var startDate, endDate time.Time
+	if startDateStr, ok := filters["startDate"].(string); ok && startDateStr != "" {
+		parsed, err := time.Parse(time.RFC3339, startDateStr)
+		if err == nil {
+			startDate = parsed
+		}
+	}
+	if endDateStr, ok := filters["endDate"].(string); ok && endDateStr != "" {
+		parsed, err := time.Parse(time.RFC3339, endDateStr)
+		if err == nil {
+			endDate = parsed
+		}
+	}
+
+	var filtered []*models.SystemLog
+	for _, log := range allLogs {
+		// Check archived filter
+		if !includeArchived && log.IsArchived {
+			continue
+		}
+
+		// Check type filter
+		if logTypeFilter != "" && string(log.Type) != logTypeFilter {
+			continue
+		}
+
+		// Check category filter
+		if categoryFilter != "" && log.Category != categoryFilter {
+			continue
+		}
+
+		// Check severity filter
+		if severityFilter != "" && log.Severity != severityFilter {
+			continue
+		}
+
+		// Check date range
+		if !startDate.IsZero() && log.TimeDetected.Before(startDate) {
+			continue
+		}
+		if !endDate.IsZero() && log.TimeDetected.After(endDate) {
+			continue
+		}
+
+		// Check metadata filters
+		if userIDFilter != "" {
+			if val, ok := log.Metadata["userId"].(string); !ok || val != userIDFilter {
+				continue
+			}
+		}
+
+		if volunteerIDFilter != "" {
+			if val, ok := log.Metadata["volunteerId"].(string); !ok || val != volunteerIDFilter {
+				continue
+			}
+		}
+
+		if eventIDFilter != "" {
+			if val, ok := log.Metadata["eventId"].(string); !ok || val != eventIDFilter {
+				continue
+			}
+		}
+
+		if departmentIDFilter != "" {
+			if val, ok := log.Metadata["departmentId"].(string); !ok || val != departmentIDFilter {
+				continue
+			}
+		}
+
+		filtered = append(filtered, log)
+	}
+
+	// Get total count by fetching all and filtering
+	// For performance, we'll use the filtered count as approximate
+	totalCount := len(filtered)
+
+	// Apply limit
+	if len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+
+	return filtered, totalCount, nil
+}

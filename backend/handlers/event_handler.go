@@ -6,6 +6,7 @@ import (
 	"sheduling-server/models"
 	sub_model "sheduling-server/models/sub_models"
 	"sheduling-server/repository"
+	"sheduling-server/utils"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -72,6 +73,18 @@ func (h *EventHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Log event creation
+	locationStr := ""
+	if event.Location != nil {
+		locationStr = event.Location.Address
+	}
+	utils.CreateEnhancedLog(c, h.db, sub_model.EVENT_CREATED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_EVENT_ID:        event.ID,
+		sub_model.META_EVENT_NAME:      event.Name,
+		sub_model.META_EVENT_DATE_TIME: event.TimeAndDate,
+		sub_model.META_LOCATION:        locationStr,
+	})
+
 	c.JSON(201, event)
 }
 
@@ -93,18 +106,33 @@ func (h *EventHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Track changes for logging
+	changes := make(map[string]interface{})
+
 	// Update only provided fields
-	if updateInput.Name != nil {
+	if updateInput.Name != nil && *updateInput.Name != existingEvent.Name {
+		changes["oldName"] = existingEvent.Name
+		changes["newName"] = *updateInput.Name
 		existingEvent.Name = *updateInput.Name
 	}
-	if updateInput.Description != nil {
+	if updateInput.Description != nil && *updateInput.Description != existingEvent.Description {
+		changes[sub_model.META_OLD_DESCRIPTION] = existingEvent.Description
+		changes[sub_model.META_NEW_DESCRIPTION] = *updateInput.Description
 		existingEvent.Description = *updateInput.Description
 	}
-	if updateInput.TimeAndDate != nil {
+	if updateInput.TimeAndDate != nil && !updateInput.TimeAndDate.Equal(existingEvent.TimeAndDate) {
+		changes[sub_model.META_OLD_DATE_TIME] = existingEvent.TimeAndDate
+		changes[sub_model.META_NEW_DATE_TIME] = *updateInput.TimeAndDate
 		existingEvent.TimeAndDate = *updateInput.TimeAndDate
 	}
 	// Map location from DTO to model if provided
 	if updateInput.Location != nil {
+		oldLoc := ""
+		if existingEvent.Location != nil {
+			oldLoc = existingEvent.Location.Address
+		}
+		changes[sub_model.META_OLD_LOCATION] = oldLoc
+		changes[sub_model.META_NEW_LOCATION] = updateInput.Location.Address
 		existingEvent.Location = &models.EventLocation{
 			Address: updateInput.Location.Address,
 			Lat:     updateInput.Location.Lat,
@@ -133,6 +161,15 @@ func (h *EventHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Log event update if there were changes
+	if len(changes) > 0 {
+		utils.CreateEnhancedLog(c, h.db, sub_model.EVENT_UPDATED, sub_model.SEVERITY_INFO, map[string]interface{}{
+			sub_model.META_EVENT_ID:   existingEvent.ID,
+			sub_model.META_EVENT_NAME: existingEvent.Name,
+			sub_model.META_CHANGES:    changes,
+		})
+	}
+
 	c.JSON(200, existingEvent)
 }
 
@@ -158,6 +195,14 @@ func (h *EventHandler) Delete(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log event deletion (soft delete)
+	utils.CreateEnhancedLog(c, h.db, sub_model.EVENT_DELETED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_EVENT_ID:   existingEvent.ID,
+		sub_model.META_EVENT_NAME: existingEvent.Name,
+		sub_model.META_REASON:     "Soft delete via Delete endpoint",
+	})
+
 	c.JSON(200, gin.H{"message": "Event deleted successfully"})
 }
 
@@ -220,6 +265,33 @@ func (h *EventHandler) UpdateVolunteerStatus(c *gin.Context) {
 		return
 	}
 
+	// Log attendance status update
+	event, _ := h.db.EventSchedules().GetEventByID(c.Request.Context(), eventID)
+	eventName := ""
+	if event != nil {
+		eventName = event.Name
+	}
+	volunteer, _ := h.db.Volunteers().GetVolunteerByID(c.Request.Context(), volunteerID)
+	volunteerName := ""
+	if volunteer != nil {
+		volunteerName = volunteer.Name
+	}
+	metadata := map[string]interface{}{
+		sub_model.META_EVENT_ID:       eventID,
+		sub_model.META_EVENT_NAME:     eventName,
+		sub_model.META_VOLUNTEER_ID:   volunteerID,
+		sub_model.META_VOLUNTEER_NAME: volunteerName,
+	}
+	if !input.TimeIn.IsZero() {
+		metadata[sub_model.META_TIME_IN] = input.TimeIn
+		metadata[sub_model.META_ATTENDANCE_TYPE] = string(input.AttendanceType)
+	}
+	if !input.TimeOut.IsZero() {
+		metadata[sub_model.META_TIME_OUT] = input.TimeOut
+		metadata[sub_model.META_TIME_OUT_TYPE] = string(input.TimeOutType)
+	}
+	utils.CreateEnhancedLog(c, h.db, sub_model.ATTENDANCE_STATUS_UPDATED, sub_model.SEVERITY_INFO, metadata)
+
 	c.JSON(200, gin.H{"message": "Volunteer status updated successfully"})
 }
 
@@ -244,6 +316,24 @@ func (h *EventHandler) TimeOutVolunteer(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log time out
+	event, _ := h.db.EventSchedules().GetEventByID(c.Request.Context(), eventID)
+	eventName := ""
+	if event != nil {
+		eventName = event.Name
+	}
+	volunteer, _ := h.db.Volunteers().GetVolunteerByID(c.Request.Context(), volunteerID)
+	volunteerName := ""
+	if volunteer != nil {
+		volunteerName = volunteer.Name
+	}
+	utils.CreateAttendanceLog(c, h.db, sub_model.VOLUNTEER_TIMED_OUT, eventID, eventName, volunteerID, volunteerName, map[string]interface{}{
+		sub_model.META_TIME_OUT:      input.TimeOut,
+		sub_model.META_TIME_OUT_TYPE: string(input.TimeOutType),
+	})
+
+	c.JSON(200, gin.H{"message": "Volunteer timed out successfully"})
 }
 
 // time in
@@ -267,6 +357,24 @@ func (h *EventHandler) TimeInVolunteer(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Log time in
+	event, _ := h.db.EventSchedules().GetEventByID(c.Request.Context(), eventID)
+	eventName := ""
+	if event != nil {
+		eventName = event.Name
+	}
+	volunteer, _ := h.db.Volunteers().GetVolunteerByID(c.Request.Context(), volunteerID)
+	volunteerName := ""
+	if volunteer != nil {
+		volunteerName = volunteer.Name
+	}
+	utils.CreateAttendanceLog(c, h.db, sub_model.VOLUNTEER_TIMED_IN, eventID, eventName, volunteerID, volunteerName, map[string]interface{}{
+		sub_model.META_TIME_IN:         input.TimeIn,
+		sub_model.META_ATTENDANCE_TYPE: string(input.TimeInType),
+	})
+
+	c.JSON(200, gin.H{"message": "Volunteer timed in successfully"})
 }
 func (h *EventHandler) GetVolunteerStatusHistory(c *gin.Context) {
 	volunteerID := c.Param("id")
@@ -307,6 +415,18 @@ func (h *EventHandler) AddDepartmentToEvent(c *gin.Context) {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}
+
+		// Log department addition
+		event, _ := h.db.EventSchedules().GetEventByID(c.Request.Context(), eventID)
+		eventName := ""
+		if event != nil {
+			eventName = event.Name
+		}
+		utils.CreateEnhancedLog(c, h.db, sub_model.EVENT_DEPARTMENT_ADDED, sub_model.SEVERITY_INFO, map[string]interface{}{
+			sub_model.META_EVENT_ID:      eventID,
+			sub_model.META_EVENT_NAME:    eventName,
+			sub_model.META_DEPARTMENT_ID: deptID,
+		})
 	}
 
 	c.JSON(200, gin.H{"message": "Departments added to event successfully"})
@@ -321,6 +441,18 @@ func (h *EventHandler) RemoveDepartmentFromEvent(c *gin.Context) {
 		return
 	}
 
+	// Log department removal
+	event, _ := h.db.EventSchedules().GetEventByID(c.Request.Context(), eventID)
+	eventName := ""
+	if event != nil {
+		eventName = event.Name
+	}
+	utils.CreateEnhancedLog(c, h.db, sub_model.EVENT_DEPARTMENT_REMOVED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_EVENT_ID:      eventID,
+		sub_model.META_EVENT_NAME:    eventName,
+		sub_model.META_DEPARTMENT_ID: departmentID,
+	})
+
 	c.JSON(200, gin.H{"message": "Department removed from event successfully"})
 }
 
@@ -333,5 +465,59 @@ func (h *EventHandler) RemoveVolunteerFromEvent(c *gin.Context) {
 		return
 	}
 
+	// Log volunteer removal
+	event, _ := h.db.EventSchedules().GetEventByID(c.Request.Context(), eventID)
+	eventName := ""
+	if event != nil {
+		eventName = event.Name
+	}
+	volunteer, _ := h.db.Volunteers().GetVolunteerByID(c.Request.Context(), volunteerID)
+	volunteerName := ""
+	if volunteer != nil {
+		volunteerName = volunteer.Name
+	}
+	utils.CreateEnhancedLog(c, h.db, sub_model.VOLUNTEER_UNSCHEDULED, sub_model.SEVERITY_INFO, map[string]interface{}{
+		sub_model.META_EVENT_ID:       eventID,
+		sub_model.META_EVENT_NAME:     eventName,
+		sub_model.META_VOLUNTEER_ID:   volunteerID,
+		sub_model.META_VOLUNTEER_NAME: volunteerName,
+	})
+
 	c.JSON(200, gin.H{"message": "Volunteer removed from event successfully"})
+}
+
+// GetEventLogs retrieves system logs for a specific event (admin only)
+// GET /api/events/:id/logs
+func (h *EventHandler) GetEventLogs(c *gin.Context) {
+	id := c.Param("id")
+
+	// Parse pagination params
+	var query struct {
+		Limit  int `form:"limit"`
+		Offset int `form:"offset"`
+	}
+	if err := c.ShouldBindQuery(&query); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Set defaults
+	if query.Limit <= 0 {
+		query.Limit = 20
+	}
+	if query.Offset < 0 {
+		query.Offset = 0
+	}
+
+	// Fetch logs
+	logs, total, err := h.db.Logs().GetLogsByEventID(c.Request.Context(), id, query.Limit, query.Offset)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"logs":  logs,
+		"total": total,
+	})
 }
