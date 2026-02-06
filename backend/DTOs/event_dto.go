@@ -7,25 +7,35 @@ import (
 
 // DTOS FOR EVENT/SCHEDULE THINGS
 // PS: the "oneoff" thing is kinda sussy and might cause bugs and tech debt
+
+type EventLocationDTO struct {
+	Address string  `json:"address" binding:"required,min=1,max=500"`
+	Lat     float64 `json:"lat" binding:"required"`
+	Lng     float64 `json:"lng" binding:"required"`
+	PlaceID string  `json:"placeId,omitempty"`
+}
+
 // for creating an event schedule
 type Create_Event_Input struct {
-	Name                string    `json:"name" binding:"required,min=2,max=200"`
-	Description         string    `json:"description" binding:"required,max=1000"`
-	TimeAndDate         time.Time `json:"timeAndDate" binding:"required"`
-	ScheduledVolunteers []string  `json:"scheduledVolunteers,omitempty"`
-	VoluntaryVolunteers []string  `json:"voluntaryVolunteers,omitempty"`
-	AssignedGroups      []string  `json:"assignedGroups,omitempty"`
+	Name                string            `json:"name" binding:"required,min=2,max=200"`
+	Description         string            `json:"description" binding:"required,max=1000"`
+	TimeAndDate         time.Time         `json:"timeAndDate" binding:"required"`
+	Location            *EventLocationDTO `json:"location,omitempty"`
+	ScheduledVolunteers []string          `json:"scheduledVolunteers,omitempty"`
+	VoluntaryVolunteers []string          `json:"voluntaryVolunteers,omitempty"`
+	AssignedGroups      []string          `json:"assignedGroups,omitempty"`
 }
 
 // input for update request about the event
 type Update_Event_Input struct {
-	Name                *string    `json:"name,omitempty" binding:"omitempty,min=2,max=200"`
-	Description         *string    `json:"description,omitempty" binding:"omitempty,max=1000"`
-	TimeAndDate         *time.Time `json:"timeAndDate,omitempty"`
-	ScheduledVolunteers []string   `json:"scheduledVolunteers,omitempty"`
-	VoluntaryVolunteers []string   `json:"voluntaryVolunteers,omitempty"`
-	AssignedGroups      []string   `json:"assignedGroups,omitempty"`
-	IsDisabled          *bool      `json:"isDisabled,omitempty"`
+	Name                *string           `json:"name,omitempty" binding:"omitempty,min=2,max=200"`
+	Description         *string           `json:"description,omitempty" binding:"omitempty,max=1000"`
+	TimeAndDate         *time.Time        `json:"timeAndDate,omitempty"`
+	Location            *EventLocationDTO `json:"location,omitempty"`
+	ScheduledVolunteers []string          `json:"scheduledVolunteers,omitempty"`
+	VoluntaryVolunteers []string          `json:"voluntaryVolunteers,omitempty"`
+	AssignedGroups      []string          `json:"assignedGroups,omitempty"`
+	IsDisabled          *bool             `json:"isDisabled,omitempty"`
 }
 
 // sends detailed information about the Event
@@ -34,6 +44,7 @@ type GetByID_Event_Output struct {
 	Name                string                     `json:"name"`
 	Description         string                     `json:"description"`
 	TimeAndDate         time.Time                  `json:"timeAndDate"`
+	Location            *EventLocationDTO          `json:"location,omitempty"`
 	ScheduledVolunteers []string                   `json:"scheduledVolunteers"`
 	VoluntaryVolunteers []string                   `json:"voluntaryVolunteers"`
 	AssignedGroups      []string                   `json:"assignedGroups"`

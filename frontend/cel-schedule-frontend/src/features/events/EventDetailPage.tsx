@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import { eventsApi, volunteersApi, departmentsApi } from '../../api';
 import { EventSchedule, Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
@@ -56,7 +56,7 @@ export const EventDetailPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]); // fetchData is stable
 
-  const handleTimeIn = async (volunteerId: string, values: { timeIn?: string; attendanceType?: string }) => {
+  const handleTimeIn = async (volunteerId: string, values: { timeIn?: string; attendanceType?: AttendanceType }) => {
     if (!id) return;
     
     try {
@@ -566,6 +566,22 @@ export const EventDetailPage: React.FC = () => {
           </Descriptions.Item>
           <Descriptions.Item label="Date & Time">
             {format(new Date(event.timeAndDate), 'MMM dd, yyyy HH:mm')}
+          </Descriptions.Item>
+          <Descriptions.Item label="Location">
+            {event.location ? (
+              <Space>
+                <EnvironmentOutlined />
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {event.location.address}
+                </a>
+              </Space>
+            ) : (
+              '-'
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="Status">
             <Tag color={event.isDisabled ? 'red' : 'green'}>

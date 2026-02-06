@@ -57,6 +57,16 @@ func (h *EventHandler) Create(c *gin.Context) {
 		LastUpdated:         time.Now(),
 	}
 
+	// Map location from DTO to model
+	if input.Location != nil {
+		event.Location = &models.EventLocation{
+			Address: input.Location.Address,
+			Lat:     input.Location.Lat,
+			Lng:     input.Location.Lng,
+			PlaceID: input.Location.PlaceID,
+		}
+	}
+
 	if err := h.db.EventSchedules().CreateEvent(c.Request.Context(), &event); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -76,15 +86,7 @@ func (h *EventHandler) Update(c *gin.Context) {
 	}
 
 	// Bind update DTO
-	var updateInput struct {
-		Name                *string    `json:"name,omitempty"`
-		Description         *string    `json:"description,omitempty"`
-		TimeAndDate         *time.Time `json:"timeAndDate,omitempty"`
-		ScheduledVolunteers []string   `json:"scheduledVolunteers,omitempty"`
-		VoluntaryVolunteers []string   `json:"voluntaryVolunteers,omitempty"`
-		AssignedGroups      []string   `json:"assignedGroups,omitempty"`
-		IsDisabled          *bool      `json:"isDisabled,omitempty"`
-	}
+	var updateInput dtos.Update_Event_Input
 
 	if err := c.ShouldBindJSON(&updateInput); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -100,6 +102,15 @@ func (h *EventHandler) Update(c *gin.Context) {
 	}
 	if updateInput.TimeAndDate != nil {
 		existingEvent.TimeAndDate = *updateInput.TimeAndDate
+	}
+	// Map location from DTO to model if provided
+	if updateInput.Location != nil {
+		existingEvent.Location = &models.EventLocation{
+			Address: updateInput.Location.Address,
+			Lat:     updateInput.Location.Lat,
+			Lng:     updateInput.Location.Lng,
+			PlaceID: updateInput.Location.PlaceID,
+		}
 	}
 	// Should not be able to easly override the list types
 	// if updateInput.ScheduledVolunteers != nil {

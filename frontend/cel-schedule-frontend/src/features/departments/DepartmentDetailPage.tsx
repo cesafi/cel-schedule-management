@@ -57,7 +57,7 @@ export const DepartmentDetailPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to add member:', err);
       message.error('Failed to add member');
-      throw error;
+      throw err;
     }
   };
 

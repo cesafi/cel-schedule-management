@@ -3,6 +3,13 @@ import { AttendanceType, TimeOutType } from './enums';
 
 // Event Schedule types
 
+export interface EventLocation {
+  address: string;
+  lat: number;
+  lng: number;
+  placeId?: string;
+}
+
 export interface ScheduleStatus {
   volunteerID: string;
   timeIn?: string;
@@ -16,6 +23,7 @@ export interface EventSchedule {
   name: string;
   description: string;
   timeAndDate: string;
+  location?: EventLocation;
   scheduledVolunteers: string[]; // volunteer IDs
   voluntaryVolunteers: string[]; // volunteer IDs
   assignedGroups: string[]; // department IDs
@@ -29,6 +37,7 @@ export interface EventCreateDTO {
   name: string;
   description: string;
   timeAndDate: string;
+  location?: EventLocation;
   scheduledVolunteers?: string[];
   voluntaryVolunteers?: string[];
   assignedGroups?: string[];
@@ -38,6 +47,7 @@ export interface EventUpdateDTO {
   name?: string;
   description?: string;
   timeAndDate?: string;
+  location?: EventLocation;
   scheduledVolunteers?: string[];
   voluntaryVolunteers?: string[];
   assignedGroups?: string[];
