@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Typography, 
   Card, 
@@ -9,8 +9,7 @@ import {
   Space, 
   Segmented, 
   Empty,
-  Spin,
-  message 
+  Spin
 } from 'antd';
 import { 
   CalendarOutlined, 
@@ -25,8 +24,8 @@ import { useNavigate } from 'react-router-dom';
 import { isAfter, isBefore, subDays, addDays, isToday, parseISO } from 'date-fns';
 import { useAuth } from '../features/auth';
 import { EventSchedule } from '../types';
-import { eventsApi, volunteersApi, departmentsApi } from '../api';
 import { EventCard } from '../components/EventCard';
+import { useEvents, useVolunteers, useDepartments } from '../hooks';
 
 const { Title, Paragraph } = Typography;
 
@@ -36,87 +35,64 @@ export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isAdmin, isDeptHead, userDepartments } = useAuth();
   
-  const [events, setEvents] = useState<EventSchedule[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<EventSchedule[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('My Events');
-  const [loading, setLoading] = useState(true);
   
-  // Stats
-  const [totalVolunteers, setTotalVolunteers] = useState(0);
-  const [totalDepartments, setTotalDepartments] = useState(0);
-  const [upcomingEventsCount, setUpcomingEventsCount] = useState(0);
-  const [eventsNeedingHelp, setEventsNeedingHelp] = useState(0);
+  // Fetch data using React Query hooks
+  const { data: allEvents = [], isLoading: eventsLoading } = useEvents();
+  const { data: volunteers = [], isLoading: volunteersLoading } = useVolunteers(true);
+  const { data: departments = [], isLoading: departmentsLoading } = useDepartments(true);
 
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  const loading = eventsLoading || volunteersLoading || departmentsLoading;
 
-  useEffect(() => {
-    filterEvents();
-  }, [events, viewMode, user]);
+  // Filter events within date range (2 days past to 7 days future) - memoized
+  const relevantEvents = useMemo(() => {
+    const now = new Date();
+    const twoDaysAgo = subDays(now, 2);
+    const oneWeekFromNow = addDays(now, 7);
 
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      // Fetch all data in parallel
-      const [eventsData, volunteersData, departmentsData] = await Promise.all([
-        eventsApi.getAll(),
-        volunteersApi.getAll(),
-        departmentsApi.getAll()
-      ]);
+    return allEvents.filter(event => {
+      if (event.isDisabled) return false;
+      const eventDate = parseISO(event.timeAndDate);
+      return isAfter(eventDate, twoDaysAgo) && isBefore(eventDate, oneWeekFromNow);
+    }).sort((a, b) => 
+      new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime()
+    );
+  }, [allEvents]);
 
-      // Filter events within date range (2 days past to 7 days future)
-      const now = new Date();
-      const twoDaysAgo = subDays(now, 2);
-      const oneWeekFromNow = addDays(now, 7);
+  // Calculate statistics - memoized
+  const stats = useMemo(() => {
+    const now = new Date();
+    
+    const futureEvents = relevantEvents.filter(event => 
+      isAfter(parseISO(event.timeAndDate), now) || isToday(parseISO(event.timeAndDate))
+    );
+    
+    const needingHelp = futureEvents.filter(event => {
+      const scheduled = event.scheduledVolunteers?.length || 0;
+      const voluntary = event.voluntaryVolunteers?.length || 0;
+      return (scheduled + voluntary) < 3;
+    }).length;
 
-      const relevantEvents = eventsData.filter(event => {
-        if (event.isDisabled) return false;
-        const eventDate = parseISO(event.timeAndDate);
-        return isAfter(eventDate, twoDaysAgo) && isBefore(eventDate, oneWeekFromNow);
-      }).sort((a, b) => 
-        new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime()
-      );
+    return {
+      totalVolunteers: volunteers.length,
+      totalDepartments: departments.length,
+      upcomingEventsCount: futureEvents.length,
+      eventsNeedingHelp: needingHelp,
+    };
+  }, [relevantEvents, volunteers, departments]);
 
-      setEvents(relevantEvents);
-      setTotalVolunteers(volunteersData.length);
-      setTotalDepartments(departmentsData.length);
-      
-      // Calculate upcoming events (future only, not past)
-      const futureEvents = relevantEvents.filter(event => 
-        isAfter(parseISO(event.timeAndDate), now) || isToday(parseISO(event.timeAndDate))
-      );
-      setUpcomingEventsCount(futureEvents.length);
-      
-      // Events needing help (less than 3 volunteers)
-      const needingHelp = futureEvents.filter(event => {
-        const scheduled = event.scheduledVolunteers?.length || 0;
-        const voluntary = event.voluntaryVolunteers?.length || 0;
-        return (scheduled + voluntary) < 3;
-      }).length;
-      setEventsNeedingHelp(needingHelp);
-
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
-      message.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterEvents = () => {
+  // Filter events based on view mode - memoized
+  const filteredEvents = useMemo(() => {
     if (viewMode === 'All Events') {
-      setFilteredEvents(events);
-      return;
+      return relevantEvents;
     }
 
     // My Events filtering
     if (!user || !user.volunteerId) {
-      setFilteredEvents([]);
-      return;
+      return [];
     }
 
-    const myEvents = events.filter(event => {
+    return relevantEvents.filter(event => {
       // Check if user is assigned as volunteer
       const isAssignedVolunteer = 
         event.scheduledVolunteers?.includes(user.volunteerId) ||
@@ -129,23 +105,10 @@ export const HomePage: React.FC = () => {
 
       return isAssignedVolunteer || isDeptHeadOfEvent;
     });
+  }, [viewMode, relevantEvents, user, isDeptHead, userDepartments]);
 
-    setFilteredEvents(myEvents);
-  };
-
-  const handleQuickCheckIn = async (eventId: string) => {
-    try {
-      if (!user?.volunteerId) {
-        message.warning('Please log in to check in');
-        return;
-      }
-      
-      // Navigate to event detail page where they can check in
-      navigate(`/events/${eventId}`);
-    } catch (error) {
-      console.error('Check-in failed:', error);
-      message.error('Failed to check in');
-    }
+  const handleQuickCheckIn = (eventId: string) => {
+    navigate(`/events/${eventId}`);
   };
 
   const todaysEvents = filteredEvents.filter(event => 
@@ -174,9 +137,9 @@ export const HomePage: React.FC = () => {
           <Card>
             <Statistic
               title="Upcoming Events"
-              value={upcomingEventsCount}
+              value={stats.upcomingEventsCount}
               prefix={<CalendarOutlined />}
-              styles={{ value: { color: '#1890ff' } }}
+              valueStyle={{ color: '#1890ff' }}
             />
           </Card>
         </Col>
@@ -184,9 +147,9 @@ export const HomePage: React.FC = () => {
           <Card>
             <Statistic
               title="Total Volunteers"
-              value={totalVolunteers}
+              value={stats.totalVolunteers}
               prefix={<UserOutlined />}
-              styles={{ value: { color: '#52c41a' } }}
+              valueStyle={{ color: '#52c41a' }}
             />
           </Card>
         </Col>
@@ -194,9 +157,9 @@ export const HomePage: React.FC = () => {
           <Card>
             <Statistic
               title="Active Departments"
-              value={totalDepartments}
+              value={stats.totalDepartments}
               prefix={<TeamOutlined />}
-              styles={{ value: { color: '#722ed1' } }}
+              valueStyle={{ color: '#722ed1' }}
             />
           </Card>
         </Col>
@@ -204,9 +167,9 @@ export const HomePage: React.FC = () => {
           <Card>
             <Statistic
               title="Needs Volunteers"
-              value={eventsNeedingHelp}
+              value={stats.eventsNeedingHelp}
               prefix={<AlertOutlined />}
-              styles={{ value: { color: eventsNeedingHelp > 0 ? '#faad14' : '#52c41a' } }}
+              valueStyle={{ color: stats.eventsNeedingHelp > 0 ? '#faad14' : '#52c41a' }}
             />
           </Card>
         </Col>

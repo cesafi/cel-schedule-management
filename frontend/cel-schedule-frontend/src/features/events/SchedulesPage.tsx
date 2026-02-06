@@ -1,199 +1,178 @@
-import React, { useState, useEffect } from 'react';
-import { Typography, Table, Button, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, CalendarOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { eventsApi, departmentsApi } from '../../api';
-import { EventSchedule, EventCreateDTO, Department } from '../../types';
+import React, { useState, useCallback } from 'react';
+import { Typography, Button, Space, Empty } from 'antd';
+import { PlusOutlined, CalendarOutlined } from '@ant-design/icons';
+import { EventSchedule, EventCreateDTO } from '../../types';
 import { useAuth } from '../auth';
-import { format } from 'date-fns';
 import { EventFormModal } from './modals/EventFormModal';
+import { 
+  EventFilters, 
+  ViewModeSelector, 
+  EventsTableView, 
+  EventsCardView, 
+  EventsCalendarView,
+  EventStatistics,
+  useViewMode 
+} from './components';
+import { useEvents, useDepartments, useEventFilters, useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks';
 
 const { Title } = Typography;
 
 export const SchedulesPage: React.FC = () => {
-  const [events, setEvents] = useState<EventSchedule[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventSchedule | null>(null);
-  const navigate = useNavigate();
   const { isAdmin } = useAuth();
+  const [viewMode, setViewMode] = useViewMode();
 
-  const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      const data = await eventsApi.getAll();
-      setEvents(data);
-    } catch (err) {
-      console.error('Failed to load events:', err);
-      message.error('Failed to load events');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch data using React Query hooks
+  const { data: events = [], isLoading: eventsLoading } = useEvents();
+  const { data: departments = [], isLoading: deptsLoading } = useDepartments();
 
-  const fetchDepartments = async () => {
-    try {
-      const data = await departmentsApi.getAll();
-      setDepartments(data.filter(d => !d.isDisabled));
-    } catch (err) {
-      console.error('Failed to load departments:', err);
-      message.error('Failed to load departments');
-    }
-  };
+  // Mutations
+  const createEvent = useCreateEvent();
+  const updateEvent = useUpdateEvent(editingEvent?.id || '');
+  const deleteEvent = useDeleteEvent();
 
-  useEffect(() => {
-    fetchEvents();
-    fetchDepartments();
-  }, []);
+  // Filtering
+  const {
+    filters,
+    filteredEvents,
+    setSearchTerm,
+    setDateRange,
+    setCustomDateRange,
+    setDepartments,
+    setStatuses,
+    setHasLocation,
+    resetFilters,
+    hasActiveFilters,
+  } = useEventFilters(events);
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setEditingEvent(null);
     setModalOpen(true);
-  };
+  }, []);
 
-  const handleEdit = (event: EventSchedule) => {
+  const handleEdit = useCallback((event: EventSchedule) => {
     setEditingEvent(event);
     setModalOpen(true);
-  };
+  }, []);
 
-  const handleDelete = async (id: string) => {
-    try {
-      await eventsApi.delete(id);
-      message.success('Event deleted successfully');
-      fetchEvents();
-    } catch (err) {
-      console.error('Failed to delete event:', err);
-      message.error('Failed to delete event');
-    }
-  };
+  const handleDelete = useCallback(async (id: string) => {
+    deleteEvent.mutate(id);
+  }, [deleteEvent]);
 
-  const handleSubmit = async (data: EventCreateDTO) => {
+  const handleSubmit = useCallback(async (data: EventCreateDTO) => {
     try {
       if (editingEvent) {
-        await eventsApi.update(editingEvent.id, data);
-        message.success('Event updated successfully');
+        await updateEvent.mutateAsync(data);
       } else {
-        await eventsApi.create(data);
-        message.success('Event created successfully');
+        await createEvent.mutateAsync(data);
       }
       setModalOpen(false);
-      fetchEvents();
+      setEditingEvent(null);
     } catch (err) {
-      console.error(`Failed to ${editingEvent ? 'update' : 'create'} event:`, err);
-      message.error(`Failed to ${editingEvent ? 'update' : 'create'} event`);
+      // Error messages handled by mutation hooks
       throw err;
     }
-  };
+  }, [editingEvent, createEvent, updateEvent]);
 
-  const columns = [
-    {
-      title: 'Event Name',
-      dataIndex: 'name',
-      key: 'name',
-      sorter: (a: EventSchedule, b: EventSchedule) => a.name.localeCompare(b.name),
-    },
-    {
-      title: 'Date & Time',
-      dataIndex: 'timeAndDate',
-      key: 'timeAndDate',
-      render: (date: string) => format(new Date(date), 'MMM dd, yyyy HH:mm'),
-      sorter: (a: EventSchedule, b: EventSchedule) => 
-        new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime(),
-    },
-    {
-      title: 'Departments',
-      dataIndex: 'assignedGroups',
-      key: 'assignedGroups',
-      render: (groups: string[]) => {
-        if (!groups || groups.length === 0) return 0;
-        return groups.map(deptId => {
-          const dept = departments.find(d => d.id === deptId);
-          return dept?.departmentName || deptId;
-        }).join(', ');
-      },
-    },
-    {
-      title: 'Volunteers',
-      key: 'volunteers',
-      render: (_: unknown, record: EventSchedule) => 
-        (record.scheduledVolunteers?.length || 0) + (record.voluntaryVolunteers?.length || 0),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'isDisabled',
-      key: 'isDisabled',
-      render: (isDisabled: boolean) => (
-        <Tag color={isDisabled ? 'red' : 'green'}>
-          {isDisabled ? 'Cancelled' : 'Active'}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_: unknown, record: EventSchedule) => (
-        <Space size="small">
-          <Button
-            type="link"
-            icon={<EyeOutlined />}
-            onClick={() => navigate(`/events/${record.id}`)}
-          >
-            View
-          </Button>
-          {isAdmin && (
-            <>
-              <Button
-                type="link"
-                icon={<EditOutlined />}
-                onClick={() => handleEdit(record)}
-              >
-                Edit
-              </Button>
-              <Popconfirm
-                title="Delete event"
-                description="Are you sure you want to delete this event?"
-                onConfirm={() => handleDelete(record.id)}
-                okText="Yes"
-                cancelText="No"
-              >
-                <Button type="link" danger icon={<DeleteOutlined />}>
-                  Delete
-                </Button>
-              </Popconfirm>
-            </>
-          )}
-        </Space>
-      ),
-    },
-  ];
+  const handleModalCancel = useCallback(() => {
+    setModalOpen(false);
+    setEditingEvent(null);
+  }, []);
+
+  const loading = eventsLoading || deptsLoading;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={2}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: '16px' }}>
+        <Title level={2} style={{ margin: 0 }}>
           <CalendarOutlined /> Event Schedules
         </Title>
-        {isAdmin && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            Create Event
-          </Button>
-        )}
+        <Space>
+          <ViewModeSelector value={viewMode} onChange={setViewMode} />
+          {isAdmin && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              Create Event
+            </Button>
+          )}
+        </Space>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={events}
-        rowKey="id"
-        loading={loading}
-        pagination={{ pageSize: 10 }}
+      {/* Statistics */}
+      <EventStatistics events={filteredEvents} />
+
+      {/* Filters */}
+      <EventFilters
+        searchTerm={filters.searchTerm}
+        dateRange={filters.dateRange}
+        customDateStart={filters.customDateStart}
+        customDateEnd={filters.customDateEnd}
+        departments={filters.departments}
+        statuses={filters.statuses}
+        hasLocation={filters.hasLocation}
+        availableDepartments={departments}
+        onSearchChange={setSearchTerm}
+        onDateRangeChange={setDateRange}
+        onCustomDateChange={setCustomDateRange}
+        onDepartmentsChange={setDepartments}
+        onStatusesChange={setStatuses}
+        onLocationChange={setHasLocation}
+        onReset={resetFilters}
+        hasActiveFilters={hasActiveFilters}
       />
 
+      {/* Content - Render based on view mode */}
+      {filteredEvents.length === 0 && !loading ? (
+        <Empty
+          description={
+            hasActiveFilters 
+              ? "No events match your filters" 
+              : "No events found"
+          }
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          style={{ marginTop: 48 }}
+        >
+          {isAdmin && !hasActiveFilters && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              Create Your First Event
+            </Button>
+          )}
+          {hasActiveFilters && (
+            <Button onClick={resetFilters}>
+              Clear Filters
+            </Button>
+          )}
+        </Empty>
+      ) : (
+        <>
+          {viewMode === 'table' && (
+            <EventsTableView
+              events={filteredEvents}
+              departments={departments}
+              isAdmin={isAdmin}
+              loading={loading}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          )}
+          
+          {viewMode === 'cards' && (
+            <EventsCardView events={filteredEvents} />
+          )}
+          
+          {viewMode === 'calendar' && (
+            <EventsCalendarView events={filteredEvents} />
+          )}
+        </>
+      )}
+
+      {/* Event Form Modal */}
       <EventFormModal
         open={modalOpen}
         event={editingEvent}
         departments={departments}
-        onCancel={() => setModalOpen(false)}
+        onCancel={handleModalCancel}
         onSubmit={handleSubmit}
       />
     </div>

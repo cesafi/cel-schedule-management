@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined } from '@ant-design/icons';
-import { eventsApi, volunteersApi, departmentsApi } from '../../api';
+import { eventsApi } from '../../api';
 import { EventSchedule, Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
 import { format } from 'date-fns';
 import { useAuth } from '../auth';
 import { AddVolunteerToEventModal } from './modals/AddVolunteerToEventModal';
 import { AddDepartmentToEventModal } from './modals/AddDepartmentToEventModal';
+import { useEvent, useVolunteers, useDepartments, useVolunteerMap, useDepartmentMap } from '../../hooks';
+import { useQueryClient } from '@tanstack/react-query';
+import { eventKeys } from '../../hooks/useEvents';
 
 const { Title } = Typography;
 
@@ -16,10 +19,8 @@ export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isDeptHead, isAdmin, canManageVolunteer } = useAuth();
-  const [event, setEvent] = useState<EventSchedule | null>(null);
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
   const [addDeptModalOpen, setAddDeptModalOpen] = useState(false);
   const [addVolunteerModalOpen, setAddVolunteerModalOpen] = useState(false);
   const [editingTimeIn, setEditingTimeIn] = useState<string | null>(null);
@@ -30,31 +31,24 @@ export const EventDetailPage: React.FC = () => {
   const [filterTimeIn, setFilterTimeIn] = useState<string | null>(null);
   const [filterTimeOut, setFilterTimeOut] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    if (!id) return;
-    
-    setLoading(true);
-    try {
-      const [eventData, volunteersData, departmentsData] = await Promise.all([
-        eventsApi.getById(id),
-        volunteersApi.getAll(),
-        departmentsApi.getAll(),
-      ]);
-      setEvent(eventData);
-      setVolunteers(volunteersData);
-      setDepartments(departmentsData);
-    } catch (err) {
-      console.error('Failed to load event data:', err);
-      message.error('Failed to load event data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch data using React Query hooks
+  const { data: event, isLoading: eventLoading } = useEvent(id);
+  const { data: volunteers = [], isLoading: volunteersLoading } = useVolunteers(true);
+  const { data: departments = [], isLoading: departmentsLoading } = useDepartments(true);
+  
+  // Create maps for O(1) lookups
+  const { volunteerMap } = useVolunteerMap(true);
+  const { departmentMap } = useDepartmentMap(true);
 
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]); // fetchData is stable
+  const loading = eventLoading || volunteersLoading || departmentsLoading;
+
+  // Refetch event data after mutations
+  const refetchEvent = useCallback(() => {
+    if (id) {
+      queryClient.invalidateQueries({ queryKey: eventKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: eventKeys.all });
+    }
+  }, [id, queryClient]);
 
   const handleTimeIn = async (volunteerId: string, values: { timeIn?: string; attendanceType?: AttendanceType }) => {
     if (!id) return;
@@ -62,13 +56,13 @@ export const EventDetailPage: React.FC = () => {
     try {
       const data: TimeInDTO = {
         timeIn: values.timeIn ? `${new Date().toISOString().split('T')[0]}T${values.timeIn}:00Z` : undefined,
-        timeInType: values.attendanceType,
+        timeInType: values.attendanceType || AttendanceType.PRESENT,
       };
       await eventsApi.timeIn(id, volunteerId, data);
       message.success('Volunteer checked in successfully');
       setEditingTimeIn(null);
       timeInForm.resetFields();
-      fetchData();
+      refetchEvent();
     } catch (err) {
       console.error('Failed to check in volunteer:', err);
       message.error('Failed to check in volunteer');
@@ -87,7 +81,7 @@ export const EventDetailPage: React.FC = () => {
       message.success('Volunteer checked out successfully');
       setEditingTimeOut(null);
       timeOutForm.resetFields();
-      fetchData();
+      refetchEvent();
     } catch (err) {
       console.error('Failed to check out volunteer:', err);
       message.error('Failed to check out volunteer');
@@ -101,7 +95,7 @@ export const EventDetailPage: React.FC = () => {
       await eventsApi.addDepartmentsToEvent(id, departmentIds);
       message.success('Departments added successfully');
       setAddDeptModalOpen(false);
-      fetchData();
+      refetchEvent();
     } catch (err) {
       console.error('Failed to add departments:', err);
       message.error('Failed to add departments');
@@ -114,7 +108,7 @@ export const EventDetailPage: React.FC = () => {
     try {
       await eventsApi.removeDepartmentFromEvent(id, departmentId);
       message.success('Department removed successfully');
-      fetchData();
+      refetchEvent();
     } catch (err) {
       console.error('Failed to remove department:', err);
       message.error('Failed to remove department');
@@ -127,7 +121,7 @@ export const EventDetailPage: React.FC = () => {
     try {
       await eventsApi.removeVolunteerFromEvent(id, volunteerId);
       message.success('Volunteer removed from event successfully');
-      fetchData();
+      refetchEvent();
     } catch (err) {
       console.error('Failed to remove volunteer:', err);
       message.error('Failed to remove volunteer');
@@ -147,7 +141,7 @@ export const EventDetailPage: React.FC = () => {
       await eventsApi.update(id, data);
       message.success('Volunteers added successfully');
       setAddVolunteerModalOpen(false);
-      fetchData();
+      refetchEvent();
     } catch (err) {
       console.error('Failed to add volunteers:', err);
       message.error('Failed to add volunteers');
@@ -155,39 +149,28 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}>
-        <Spin size="large" />
-      </div>
+  const getVolunteerDepartments = useCallback((volunteerId: string): Department[] => {
+    return departments.filter((d: Department) => 
+      d.volunteerMembers?.some((m: any) => m.volunteerID === volunteerId)
     );
-  }
-
-  if (!event) {
-    return <div>Event not found</div>;
-  }
-
-  const getVolunteerDepartments = (volunteerId: string) => {
-    return departments.filter(d => 
-      d.volunteerMembers?.some(m => m.volunteerID === volunteerId)
-    );
-  };
+  }, [departments]);
 
   // Type for status records in tables
   type StatusRecord = { volunteerID: string; timeIn?: string; timeOut?: string; attendanceType?: string; timeOutType?: string };
 
-  const attendanceColumns = [
+  // Memoize attendance columns for performance
+  const attendanceColumns = useMemo(() => [
     {
       title: 'Volunteer',
       dataIndex: 'volunteerID',
       key: 'volunteerID',
       sorter: (a: StatusRecord, b: StatusRecord) => {
-        const volA = volunteers.find(v => v.id === a.volunteerID);
-        const volB = volunteers.find(v => v.id === b.volunteerID);
+        const volA = volunteerMap.get(a.volunteerID);
+        const volB = volunteerMap.get(b.volunteerID);
         return (volA?.name || '').localeCompare(volB?.name || '');
       },
       render: (volunteerId: string) => {
-        const volunteer = volunteers.find(v => v.id === volunteerId);
+        const volunteer = volunteerMap.get(volunteerId);
         return volunteer ? (
           <Button type="link" onClick={() => navigate(`/volunteers/${volunteerId}`)}>
             {volunteer.name}
@@ -209,7 +192,7 @@ export const EventDetailPage: React.FC = () => {
         const volunteerDepts = getVolunteerDepartments(record.volunteerID);
         return volunteerDepts.length > 0 ? (
           <Space wrap>
-            {volunteerDepts.map(d => (
+            {volunteerDepts.map((d: Department) => (
               <Tag key={d.id} color="blue">
                 {d.departmentName}
               </Tag>
@@ -414,15 +397,15 @@ export const EventDetailPage: React.FC = () => {
         );
       },
     },
-  ];
+  ], [volunteerMap, navigate, isAdmin, canManageVolunteer, editingTimeIn, editingTimeOut, timeInForm, timeOutForm, getVolunteerDepartments]);
 
-  const departmentColumns = [
+  const departmentColumns = useMemo(() => [
     {
       title: 'Department',
       dataIndex: 'id',
       key: 'id',
       render: (_: unknown, deptId: string) => {
-        const dept = departments.find(d => d.id === deptId);
+        const dept = departmentMap.get(deptId);
         console.log("Debug Dept Info: ", deptId, dept);
         return dept ? (
           <Button type="link" onClick={() => navigate(`/departments/${deptId}`)}>
@@ -435,7 +418,7 @@ export const EventDetailPage: React.FC = () => {
       title: 'Members',
       key: 'members',
       render: (_: unknown, deptId: string) => {
-        const dept = departments.find(d => d.id === deptId);
+        const dept = departmentMap.get(deptId);
         console.log("Debug Dept Members: ", deptId, dept);
         return dept?.volunteerMembers?.length || 0;
       },
@@ -460,7 +443,7 @@ export const EventDetailPage: React.FC = () => {
         );
       },
     },
-  ];
+  ], [departmentMap, navigate, isAdmin, handleRemoveDepartment]);
 
   // Unused for now - kept for future feature
   // const checkedInVolunteerIds = event.statuses?.map(s => s.volunteerID) || [];
@@ -471,9 +454,12 @@ export const EventDetailPage: React.FC = () => {
   //        ((event.scheduledVolunteers || []).includes(v.id) || (event.voluntaryVolunteers || []).includes(v.id))
   // );
 
-  const availableDepartments = departments.filter(
-    d => !d.isDisabled && !(event.assignedGroups || []).includes(d.id)
-  );
+  const availableDepartments = useMemo(() => {
+    if (!event) return [];
+    return departments.filter(
+      (d: Department) => !d.isDisabled && !(event.assignedGroups || []).includes(d.id)
+    );
+  }, [event, departments]);
 
   // Unused for now - TODO: implement volunteer scheduling feature
   // const unscheduledVolunteers = volunteers.filter(
@@ -485,32 +471,36 @@ export const EventDetailPage: React.FC = () => {
   //   vid => !(event.statuses || []).some(s => s.volunteerID === vid)
   // );
 
-  // Filter attendance data
-  const filteredAttendance = (event.statuses || []).filter((record) => {
-    // Filter by department
-    if (filterDepartment) {
-      const volunteerDepts = getVolunteerDepartments(record.volunteerID);
-      if (filterDepartment === 'none') {
-        if (volunteerDepts.length > 0) return false;
-      } else {
-        if (!volunteerDepts.some(d => d.id === filterDepartment)) return false;
+  // Filter attendance data - memoized for performance
+  const filteredAttendance = useMemo(() => {
+    if (!event) return [];
+    
+    return (event.statuses || []).filter((record) => {
+      // Filter by department
+      if (filterDepartment) {
+        const volunteerDepts = getVolunteerDepartments(record.volunteerID);
+        if (filterDepartment === 'none') {
+          if (volunteerDepts.length > 0) return false;
+        } else {
+          if (!volunteerDepts.some((d: Department) => d.id === filterDepartment)) return false;
+        }
       }
-    }
 
-    // Filter by time in status (check attendanceType instead of timeIn)
-    if (filterTimeIn) {
-      if (filterTimeIn === 'yes' && !record.attendanceType) return false;
-      if (filterTimeIn === 'no' && record.attendanceType) return false;
-    }
+      // Filter by time in status (check attendanceType instead of timeIn)
+      if (filterTimeIn) {
+        if (filterTimeIn === 'yes' && !record.attendanceType) return false;
+        if (filterTimeIn === 'no' && record.attendanceType) return false;
+      }
 
-    // Filter by time out status (check timeOutType instead of timeOut)
-    if (filterTimeOut) {
-      if (filterTimeOut === 'yes' && !record.timeOutType) return false;
-      if (filterTimeOut === 'no' && record.timeOutType) return false;
-    }
+      // Filter by time out status (check timeOutType instead of timeOut)
+      if (filterTimeOut) {
+        if (filterTimeOut === 'yes' && !record.timeOutType) return false;
+        if (filterTimeOut === 'no' && record.timeOutType) return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
+  }, [event, filterDepartment, filterTimeIn, filterTimeOut, getVolunteerDepartments]);
 
   // Unused for now - TODO: implement volunteer table feature
   // const scheduledVolunteerColumns = [
@@ -541,12 +531,25 @@ export const EventDetailPage: React.FC = () => {
       }
       message.success('Volunteers added to attendance');
       setAddVolunteerModalOpen(false);
-      fetchData();
+      refetchEvent();
     } catch (error) {
       message.error('Failed to add volunteers to attendance');
       throw error;
     }
   };
+
+  // Add conditional returns AFTER all hooks
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (!event) {
+    return <div>Event not found</div>;
+  }
 
   return (
     <div>
@@ -616,7 +619,7 @@ export const EventDetailPage: React.FC = () => {
                         onChange={setFilterDepartment}
                       >
                         <Select.Option value="none">No Department</Select.Option>
-                        {departments.filter(d => !d.isDisabled).map(d => (
+                        {departments.filter((d: Department) => !d.isDisabled).map((d: Department) => (
                           <Select.Option key={d.id} value={d.id}>
                             {d.departmentName}
                           </Select.Option>
@@ -702,7 +705,7 @@ export const EventDetailPage: React.FC = () => {
       {/* Add Volunteer Modal */}
       <AddVolunteerToEventModal
         open={addVolunteerModalOpen}
-        availableVolunteers={volunteers.filter(v => !v.isDisabled && !event.statuses?.some(s => s.volunteerID === v.id))}
+        availableVolunteers={volunteers.filter((v: Volunteer) => !v.isDisabled && !event.statuses?.some(s => s.volunteerID === v.id))}
         departments={departments}
         onCancel={() => setAddVolunteerModalOpen(false)}
         onSubmit={handleAddVolunteersToAttendance}
