@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { Typography, Card, Tabs, Form, Input, Button, Select, message } from 'antd';
-import { UserAddOutlined, TeamOutlined } from '@ant-design/icons';
+import { UserAddOutlined, TeamOutlined, UploadOutlined } from '@ant-design/icons';
 import { authApi, volunteersApi } from '../../api';
 import { AuthUserCreateDTO, VolunteerCreateDTO, AccessLevel } from '../../types';
+import { BatchImportWizard } from './components';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { Title, Paragraph } = Typography;
 const { TabPane } = Tabs;
 
 export const AdminPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [batchImportVisible, setBatchImportVisible] = useState(false);
   const [userForm] = Form.useForm();
   const [volunteerForm] = Form.useForm();
+  const queryClient = useQueryClient();
 
   const handleCreateUser = async (values: AuthUserCreateDTO) => {
     setLoading(true);
@@ -44,6 +48,13 @@ export const AdminPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBatchImportSuccess = () => {
+    // Invalidate queries to refresh data
+    queryClient.invalidateQueries({ queryKey: ['departments'] });
+    queryClient.invalidateQueries({ queryKey: ['volunteers'] });
+    message.success('Batch import completed! Data has been refreshed.');
   };
 
   return (
@@ -120,6 +131,23 @@ export const AdminPage: React.FC = () => {
           </Card>
         </TabPane>
 
+        <TabPane tab="Batch Import" key="batch-import" icon={<UploadOutlined />}>
+          <Card title="Batch Import Departments & Volunteers" style={{ maxWidth: 800 }}>
+            <Paragraph>
+              Import multiple departments and volunteers at once from an Excel file.
+              Each column in the Excel file represents a department with its head and members.
+            </Paragraph>
+            <Button 
+              type="primary" 
+              icon={<UploadOutlined />}
+              size="large"
+              onClick={() => setBatchImportVisible(true)}
+            >
+              Start Batch Import
+            </Button>
+          </Card>
+        </TabPane>
+
         <TabPane tab="System Logs" key="logs">
           <Card title="System Logs">
             <Paragraph>System logging interface - Coming soon</Paragraph>
@@ -130,6 +158,12 @@ export const AdminPage: React.FC = () => {
           </Card>
         </TabPane>
       </Tabs>
+
+      <BatchImportWizard
+        visible={batchImportVisible}
+        onClose={() => setBatchImportVisible(false)}
+        onSuccess={handleBatchImportSuccess}
+      />
     </div>
   );
 };

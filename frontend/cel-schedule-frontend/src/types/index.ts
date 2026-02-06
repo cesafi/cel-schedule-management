@@ -7,3 +7,4 @@ export * from './department';
 export * from './event';
 export * from './log';
 export * from './api';
+export * from './batchImport';

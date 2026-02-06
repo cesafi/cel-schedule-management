@@ -57,6 +57,7 @@ func main() {
 	eventHandler := handlers.NewEventHandler(db)
 	authUserHandler := handlers.NewAuthUserHandler(db)
 	oauthHandler := handlers.NewOAuthHandler(db)
+	batchImportHandler := handlers.NewBatchImportHandler(db)
 
 	// Setup Gin router
 	r := gin.Default()
@@ -188,6 +189,15 @@ func main() {
 		authUsers.GET("/:id", authUserHandler.GetByID)
 		authUsers.POST("", authUserHandler.Create)
 		authUsers.PUT("/:id", authUserHandler.Update)
+	}
+
+	// Batch Import routes (Admin only)
+	batchImport := r.Group("/api/batch-import")
+	batchImport.Use(middleware.RequireAuth())
+	batchImport.Use(middleware.RequireAdmin())
+	{
+		batchImport.POST("/preview", batchImportHandler.PreviewBatchImport)
+		batchImport.POST("/execute", batchImportHandler.ExecuteBatchImport)
 	}
 
 	// Start server
