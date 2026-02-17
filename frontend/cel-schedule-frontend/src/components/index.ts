@@ -5,4 +5,5 @@ export { AttendancePieChart } from './AttendancePieChart';
 export { AttendanceTrendChart } from './AttendanceTrendChart';
 export { DateRangePicker } from './DateRangePicker';
 export { LogsTable } from './LogsTable';
+export { ThemeTransitionOverlay } from './ThemeTransitionOverlay';
 
