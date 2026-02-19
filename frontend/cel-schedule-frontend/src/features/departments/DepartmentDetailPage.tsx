@@ -44,19 +44,34 @@ export const DepartmentDetailPage: React.FC = () => {
   const fetchData = async () => {
     if (!id) return;
     
+    console.log('[DepartmentDetail] Fetching data for department ID:', id);
+    
     setLoading(true);
     try {
       const [deptData, historyData, volunteersData] = await Promise.all([
-        departmentsApi.getById(id),
-        departmentsApi.getStatusHistory(id),
-        volunteersApi.getAll(),
+        departmentsApi.getById(id).then(data => {
+          console.log('[DepartmentDetail] Department data fetched:', data);
+          return data;
+        }),
+        departmentsApi.getStatusHistory(id).then(data => {
+          console.log('[DepartmentDetail] Status history fetched:', data.length, 'items');
+          return data;
+        }),
+        volunteersApi.getAll().then(data => {
+          console.log('[DepartmentDetail] Volunteers fetched:', data.length, 'items');
+          return data;
+        }),
       ]);
       setDepartment(deptData);
       setHistory(historyData);
       setVolunteers(volunteersData.filter(v => !v.isDisabled));
     } catch (err) {
-      console.error('Failed to load department data:', err);
-      message.error('Failed to load department data');
+      console.error('[DepartmentDetail] Failed to load department data:', err);
+      if (err instanceof Error) {
+        message.error(`Failed to load department: ${err.message}`);
+      } else {
+        message.error('Failed to load department data');
+      }
     } finally {
       setLoading(false);
     }

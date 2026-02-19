@@ -235,7 +235,6 @@ func (r *eventScheduleRepo) GetAllStatusOfDepartment(ctx context.Context, dept_i
 		}
 
 		event.ID = doc.Ref.ID
-
 		// Filter statuses to only include volunteers in the department
 		filteredStatuses := []sub_model.ScheduleStatus{}
 		for _, status := range event.Statuses {

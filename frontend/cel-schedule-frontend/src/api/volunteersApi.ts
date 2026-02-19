@@ -1,18 +1,17 @@
 import apiClient from './client';
+import { firestoreService } from '../services/firestore';
 import { Volunteer, VolunteerCreateDTO, VolunteerUpdateDTO, StatusHistoryItem } from '../types';
 import type { LogListResponse } from '../types/log';
 
 export const volunteersApi = {
-  // Get all volunteers
+  // Get all volunteers - Direct from Firebase (no cold start!)
   async getAll(): Promise<Volunteer[]> {
-    const response = await apiClient.get<Volunteer[]>('/volunteers');
-    return response.data;
+    return firestoreService.volunteers.getAll();
   },
 
-  // Get volunteer by ID
+  // Get volunteer by ID - Direct from Firebase (no cold start!)
   async getById(id: string): Promise<Volunteer> {
-    const response = await apiClient.get<Volunteer>(`/volunteers/${id}`);
-    return response.data;
+    return firestoreService.volunteers.getById(id);
   },
 
   // Get volunteer status history

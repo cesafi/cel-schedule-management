@@ -1,4 +1,5 @@
 import { Table, Tag, Typography, Card } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { SystemLog } from '../../../types';
 import dayjs from 'dayjs';
 import { useState } from 'react';
@@ -34,12 +35,13 @@ export const SystemLogsTable = ({
     return 'default';
   };
 
-  const columns = [
+  const columns: ColumnsType<SystemLog> = [
     {
       title: 'Timestamp',
       dataIndex: 'TimeDetected',
       key: 'timestamp',
       width: 200,
+      fixed: 'left',
       render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss'),
       sorter: (a: SystemLog, b: SystemLog) =>
         dayjs(a.TimeDetected).unix() - dayjs(b.TimeDetected).unix(),
@@ -57,6 +59,7 @@ export const SystemLogsTable = ({
       title: 'User',
       key: 'user',
       width: 200,
+      responsive: ['md'],
       render: (_: unknown, record: SystemLog) => {
         const username = record.Metadata?.username as string | undefined;
         const userId = record.Metadata?.userId as string | undefined;
@@ -77,6 +80,7 @@ export const SystemLogsTable = ({
     {
       title: 'Details',
       key: 'details',
+      responsive: ['lg'],
       render: (_: unknown, record: SystemLog) => {
         const metadata = record.Metadata || {};
         const keys = Object.keys(metadata).filter(
@@ -114,26 +118,42 @@ export const SystemLogsTable = ({
   };
 
   return (
-    <Table
-      columns={columns}
-      dataSource={logs}
-      rowKey="ID"
-      loading={loading}
-      pagination={{
-        current: currentPage,
-        pageSize: pageSize,
-        total: total,
-        showSizeChanger: true,
-        showTotal: (total) => `Total ${total} logs`,
-        pageSizeOptions: ['10', '20', '50', '100'],
-        onChange: onPageChange,
-      }}
-      expandable={{
-        expandedRowRender,
-        expandedRowKeys,
-        onExpandedRowsChange: (keys) => setExpandedRowKeys(keys as string[]),
-      }}
-      scroll={{ x: 1000 }}
-    />
+    <>
+      <style>{`
+        @media (max-width: 768px) {
+          .ant-table {
+            font-size: 12px;
+          }
+          .ant-table-thead > tr > th {
+            padding: 8px 4px;
+          }
+          .ant-table-tbody > tr > td {
+            padding: 8px 4px;
+          }
+        }
+      `}</style>
+      <Table
+        columns={columns}
+        dataSource={logs}
+        rowKey="ID"
+        loading={loading}
+        pagination={{
+          current: currentPage,
+          pageSize: pageSize,
+          total: total,
+          showSizeChanger: true,
+          showTotal: (total) => `Total ${total} logs`,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          onChange: onPageChange,
+          responsive: true,
+        }}
+        expandable={{
+          expandedRowRender,
+          expandedRowKeys,
+          onExpandedRowsChange: (keys) => setExpandedRowKeys(keys as string[]),
+        }}
+        scroll={{ x: 'max-content' }}
+      />
+    </>
   );
 };

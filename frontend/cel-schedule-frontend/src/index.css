@@ -1,11 +1,32 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Memoria Design System - Theme Variables */
+
+/* Night Mode (Default) */
+:root,
+body[data-theme="night"] {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
+  color-scheme: dark;
+  
+  /* Color Variables - Night Mode */
+  --color-bg-base: #0a0a0a;
+  --color-bg-container: #171717;
+  --color-bg-elevated: #262626;
+  --color-bg-overlay: rgba(23, 23, 23, 0.6);
+  --color-border: #404040;
+  --color-border-secondary: rgba(64, 64, 64, 0.6);
+  --color-text: #ffffff;
+  --color-text-secondary: #d4d4d4;
+  --color-text-tertiary: #a3a3a3;
+  --color-text-quaternary: #737373;
+
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: var(--color-bg-base);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,56 +34,349 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+/* Day Mode */
+body[data-theme="day"] {
+  color-scheme: light;
+  
+  /* Color Variables - Day Mode with Cobalt Blue */
+  --color-bg-base: #F5F7FA;
+  --color-bg-container: #FFFFFF;
+  --color-bg-elevated: #E8EEF5;
+  --color-bg-overlay: rgba(245, 247, 250, 0.95);
+  --color-border: #C5D1E0;
+  --color-border-secondary: rgba(197, 209, 224, 0.7);
+  --color-text: #1A1A1A;
+  --color-text-secondary: #3D3D3D;
+  --color-text-tertiary: #5C5C5C;
+  --color-text-quaternary: #7A7A7A;
+
+  color: rgba(26, 26, 26, 0.87);
+  background-color: var(--color-bg-base);
 }
-a:hover {
-  color: #535bf2;
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-bg-base);
+  color: var(--color-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#root {
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Typography Hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-text);
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  transition: color 0.3s ease;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* Custom Scrollbar - Night Mode */
+body[data-theme="night"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body[data-theme="night"] ::-webkit-scrollbar-track {
+  background: rgba(38, 38, 38, 0.3);
+}
+
+body[data-theme="night"] ::-webkit-scrollbar-thumb {
+  background: rgba(115, 115, 115, 0.5);
+  border-radius: 4px;
+}
+
+body[data-theme="night"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(115, 115, 115, 0.7);
+}
+
+/* Custom Scrollbar - Day Mode */
+body[data-theme="day"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+body[data-theme="day"] ::-webkit-scrollbar-track {
+  background: rgba(229, 229, 229, 0.5);
+}
+
+body[data-theme="day"] ::-webkit-scrollbar-thumb {
+  background: rgba(82, 82, 82, 0.5);
+  border-radius: 4px;
+}
+
+body[data-theme="day"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 82, 82, 0.7);
+}
+
+/* Mobile Responsiveness - Tables & General Layout */
+/* Tablets and below */
+@media (max-width: 1024px) {
+  .ant-table-wrapper {
+    overflow-x: auto;
   }
-  a:hover {
-    color: #747bff;
+  
+  .ant-card {
+    margin: 0 8px;
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+/* Mobile devices (tablets) */
+@media (max-width: 768px) {
+  body {
+    min-width: 100%;
+  }
+  
+  /* Table adjustments */
+  .ant-table {
+    font-size: 13px;
+  }
+  
+  .ant-table-thead > tr > th {
+    padding: 10px 6px;
+    font-size: 12px;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 10px 6px;
+  }
+  
+  .ant-table-pagination {
+    margin: 12px 0;
+  }
+  
+  /* Button adjustments */
+  .ant-btn {
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  
+  .ant-btn-sm {
+    padding: 2px 6px;
+    font-size: 12px;
+  }
+  
+  /* Card adjustments */
+  .ant-card {
+    margin: 0 4px 12px 4px;
+  }
+  
+  .ant-card-head {
+    padding: 12px 16px;
+    font-size: 16px;
+  }
+  
+  .ant-card-body {
+    padding: 16px;
+  }
+  
+  /* Form adjustments */
+  .ant-form-item {
+    margin-bottom: 16px;
+  }
+  
+  /* Modal adjustments */
+  .ant-modal {
+    max-width: calc(100vw - 32px);
+    margin: 16px;
+  }
+  
+  .ant-modal-body {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+  }
+}
+
+/* Small mobile devices */
+@media (max-width: 576px) {
+  /* Table adjustments */
+  .ant-table {
+    font-size: 11px;
+  }
+  
+  .ant-table-thead > tr > th {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 8px 4px;
+  }
+  
+  .ant-table-pagination {
+    text-align: center;
+  }
+  
+  .ant-pagination-options {
+    display: none !important;
+  }
+  
+  .ant-pagination-item,
+  .ant-pagination-prev,
+  .ant-pagination-next {
+    min-width: 28px;
+    height: 28px;
+    line-height: 26px;
+    margin: 0 2px;
+  }
+  
+  /* Typography adjustments */
+  h1.ant-typography,
+  .ant-typography h1 {
+    font-size: 24px;
+  }
+  
+  h2.ant-typography,
+  .ant-typography h2 {
+    font-size: 20px;
+  }
+  
+  h3.ant-typography,
+  .ant-typography h3 {
+    font-size: 18px;
+  }
+  
+  /* Button adjustments */
+  .ant-btn {
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+  
+  .ant-btn-sm {
+    padding: 1px 5px;
+    font-size: 11px;
+  }
+  
+  .ant-btn-icon-only {
+    width: 28px;
+    height: 28px;
+  }
+  
+  /* Space adjustments */
+  .ant-space {
+    gap: 6px !important;
+  }
+  
+  .ant-space-item {
+    margin-right: 6px !important;
+  }
+  
+  /* Card adjustments */
+  .ant-card {
+    margin: 0 0 12px 0;
+  }
+  
+  .ant-card-head {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  
+  .ant-card-body {
+    padding: 12px;
+  }
+  
+  /* Tag adjustments */
+  .ant-tag {
+    font-size: 11px;
+    padding: 0 6px;
+    line-height: 18px;
+  }
+  
+  /* Select adjustments */
+  .ant-select-selection-item {
+    font-size: 12px;
+  }
+  
+  .ant-input,
+  .ant-picker-input input {
+    font-size: 12px;
+  }
+  
+  /* Descriptions adjustments */
+  .ant-descriptions-item-label,
+  .ant-descriptions-item-content {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  /* Tabs adjustments */
+  .ant-tabs-tab {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  
+  /* Modal adjustments */
+  .ant-modal {
+    max-width: calc(100vw - 16px);
+    margin: 8px;
+  }
+  
+  .ant-modal-header {
+    padding: 12px 16px;
+  }
+  
+  .ant-modal-body {
+    padding: 16px;
+    max-height: calc(100vh - 150px);
+  }
+  
+  .ant-modal-footer {
+    padding: 10px 16px;
+  }
+  
+  .ant-modal-footer .ant-btn {
+    margin-left: 6px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 375px) {
+  .ant-table {
+    font-size: 10px;
+  }
+  
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 6px 2px;
+    font-size: 10px;
+  }
+  
+  .ant-btn {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+}
+
+/* Touch-friendly adjustments for all mobile */
+@media (hover: none) and (pointer: coarse) {
+  /* Increase touch targets */
+  .ant-btn,
+  .ant-select-selector,
+  .ant-input,
+  .ant-picker {
+    min-height: 36px;
+  }
+  
+  .ant-select-selection-item-remove,
+  .ant-modal-close-x {
+    padding: 8px;
+  }
+  
+  /* Improve scrollable areas */
+  .ant-table-body {
+    -webkit-overflow-scrolling: touch;
   }
 }

@@ -1,20 +1,17 @@
 import apiClient from './client';
+import { firestoreService } from '../services/firestore';
 import { EventSchedule, EventCreateDTO, EventUpdateDTO, AddStatusDTO, UpdateStatusDTO, TimeInDTO, TimeOutDTO } from '../types';
 import type { LogListResponse } from '../types/log';
 
 export const eventsApi = {
-  // Get all events
+  // Get all events - Direct from Firebase (no cold start!)
   async getAll(): Promise<EventSchedule[]> {
-    const response = await apiClient.get<EventSchedule[]>('/events');
-    console.log("fetched all events:", response.data);
-    return response.data;
+    return firestoreService.events.getAll();
   },
 
-  // Get event by ID
+  // Get event by ID - Direct from Firebase (no cold start!)
   async getById(id: string): Promise<EventSchedule> {
-    const response = await apiClient.get<EventSchedule>(`/events/${id}`);
-    console.log("fetched event by id:", response.data);
-    return response.data;
+    return firestoreService.events.getById(id);
   },
 
   // Create event

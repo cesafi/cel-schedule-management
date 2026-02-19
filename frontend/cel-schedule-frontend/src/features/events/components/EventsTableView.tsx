@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { Table, Button, Space, Popconfirm, Tag, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { EditOutlined, DeleteOutlined, EyeOutlined, EnvironmentOutlined, UserOutlined, TeamOutlined, WarningOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { EventSchedule, Department } from '../../../types';
@@ -43,17 +44,19 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
   }, [onDelete]);
 
   // Memoize columns
-  const columns = useMemo(() => [
+  const columns: ColumnsType<EventSchedule> = useMemo(() => [
     {
       title: 'Event Name',
       dataIndex: 'name',
       key: 'name',
+      fixed: 'left',
+      width: 200,
       sorter: (a: EventSchedule, b: EventSchedule) => a.name.localeCompare(b.name),
       render: (name: string, record: EventSchedule) => {
         const today = isToday(new Date(record.timeAndDate));
         return (
-          <Space>
-            {name}
+          <Space direction="vertical" size="small">
+            <span style={{ fontWeight: 500 }}>{name}</span>
             {today && <Tag color="green">Today</Tag>}
           </Space>
         );
@@ -63,6 +66,7 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
       title: 'Date & Time',
       dataIndex: 'timeAndDate',
       key: 'timeAndDate',
+      width: 180,
       render: (date: string) => {
         const eventDate = new Date(date);
         const past = isPast(eventDate) && !isToday(eventDate);
@@ -84,12 +88,14 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
       },
       sorter: (a: EventSchedule, b: EventSchedule) => 
         new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime(),
-      defaultSortOrder: 'ascend' as const,
+      defaultSortOrder: 'ascend',
     },
     {
       title: 'Departments',
       dataIndex: 'assignedGroups',
       key: 'assignedGroups',
+      width: 150,
+      responsive: ['md'],
       render: (groups: string[]) => {
         if (!groups || groups.length === 0) {
           return <span style={{ color: '#999' }}>None</span>;
@@ -114,6 +120,7 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
     {
       title: 'Volunteers',
       key: 'volunteers',
+      width: 120,
       render: (_: unknown, record: EventSchedule) => {
         const scheduled = record.scheduledVolunteers?.length || 0;
         const voluntary = record.voluntaryVolunteers?.length || 0;
@@ -140,6 +147,8 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
       title: 'Location',
       dataIndex: 'location',
       key: 'location',
+      width: 200,
+      responsive: ['lg'],
       render: (location: EventSchedule['location']) => {
         if (!location) return <span style={{ color: '#999' }}>-</span>;
         
@@ -166,6 +175,8 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
       title: 'Status',
       dataIndex: 'isDisabled',
       key: 'isDisabled',
+      width: 120,
+      responsive: ['sm'],
       render: (isDisabled: boolean, record: EventSchedule) => {
         const total = (record.scheduledVolunteers?.length || 0) + (record.voluntaryVolunteers?.length || 0);
         const needsHelp = total < 3;
@@ -185,12 +196,15 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
     {
       title: 'Actions',
       key: 'actions',
+      fixed: 'right',
+      width: 200,
       render: (_: unknown, record: EventSchedule) => (
-        <Space size="small">
+        <Space size="small" wrap>
           <Button
             type="link"
             icon={<EyeOutlined />}
             onClick={() => handleView(record.id)}
+            size="small"
           >
             View
           </Button>
@@ -200,6 +214,7 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
                 type="link"
                 icon={<EditOutlined />}
                 onClick={() => handleEdit(record)}
+                size="small"
               >
                 Edit
               </Button>
@@ -210,7 +225,7 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
                 okText="Yes"
                 cancelText="No"
               >
-                <Button type="link" danger icon={<DeleteOutlined />}>
+                <Button type="link" danger icon={<DeleteOutlined />} size="small">
                   Delete
                 </Button>
               </Popconfirm>
@@ -248,6 +263,32 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
         .event-row-upcoming:hover {
           background-color: #fafafa !important;
         }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+          .ant-table {
+            font-size: 12px;
+          }
+          .ant-table-thead > tr > th {
+            padding: 8px 4px;
+          }
+          .ant-table-tbody > tr > td {
+            padding: 8px 4px;
+          }
+          .ant-btn-sm {
+            padding: 0 4px;
+            font-size: 12px;
+          }
+        }
+        
+        @media (max-width: 576px) {
+          .ant-table-pagination {
+            text-align: center;
+          }
+          .ant-pagination-options {
+            display: none;
+          }
+        }
       `}</style>
       <Table
         columns={columns}
@@ -255,16 +296,39 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
         rowKey="id"
         loading={loading}
         rowClassName={rowClassName}
+        scroll={{ x: 'max-content' }}
         pagination={{ 
           pageSize: 10,
           showSizeChanger: true,
           pageSizeOptions: ['10', '25', '50', '100'],
           showTotal: (total, range) => `Showing ${range[0]}-${range[1]} of ${total} events`,
+          responsive: true,
         }}
         expandable={{
           expandedRowRender: (record) => (
-            <div style={{ paddingLeft: 24 }}>
-              <p style={{ margin: 0 }}><strong>Description:</strong> {record.description}</p>
+            <div style={{ padding: '12px 0' }}>
+              <p style={{ margin: 0, marginBottom: 8 }}><strong>Description:</strong> {record.description}</p>
+              {record.location && (
+                <p style={{ margin: 0 }}>
+                  <strong>Location:</strong>{' '}
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(record.location.address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <EnvironmentOutlined /> {record.location.address}
+                  </a>
+                </p>
+              )}
+              {record.assignedGroups && record.assignedGroups.length > 0 && (
+                <p style={{ margin: 0, marginTop: 8 }}>
+                  <strong>Departments:</strong>{' '}
+                  {record.assignedGroups
+                    .map(id => departmentMap.get(id)?.departmentName)
+                    .filter(Boolean)
+                    .join(', ')}
+                </p>
+              )}
             </div>
           ),
         }}

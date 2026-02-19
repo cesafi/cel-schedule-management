@@ -116,6 +116,7 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
       dataIndex: 'TimeDetected',
       key: 'TimeDetected',
       width: 180,
+      fixed: 'left',
       render: (timestamp: string) => (
         <Space direction="vertical" size={0}>
           <Text strong>{formatTimestamp(timestamp)}</Text>
@@ -137,6 +138,7 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
       dataIndex: 'Category',
       key: 'Category',
       width: 150,
+      responsive: ['md'],
       render: (category: string) => (
         <Tag color={getCategoryColor(category)}>{category}</Tag>
       ),
@@ -146,6 +148,7 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
       dataIndex: 'Severity',
       key: 'Severity',
       width: 100,
+      responsive: ['sm'],
       render: (severity: string) => (
         <Tag color={getSeverityColor(severity)}>{severity || 'INFO'}</Tag>
       ),
@@ -162,24 +165,41 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
   ];
 
   return (
-    <Table
-      columns={columns}
-      dataSource={logs}
-      loading={loading}
-      rowKey="ID"
-      pagination={pagination ? {
-        current: pagination.current,
-        pageSize: pagination.pageSize,
-        total: pagination.total,
-        onChange: pagination.onChange,
-        showSizeChanger: false,
-        showTotal: (total) => `Total ${total} logs`,
-      } : false}
-      expandable={{
-        expandedRowRender: (record) => renderMetadata(record.Metadata),
-        rowExpandable: (record) => Object.keys(record.Metadata || {}).length > 0,
-      }}
-      size="middle"
-    />
+    <>
+      <style>{`
+        @media (max-width: 768px) {
+          .ant-table {
+            font-size: 12px;
+          }
+          .ant-table-thead > tr > th {
+            padding: 8px 4px;
+          }
+          .ant-table-tbody > tr > td {
+            padding: 8px 4px;
+          }
+        }
+      `}</style>
+      <Table
+        columns={columns}
+        dataSource={logs}
+        loading={loading}
+        rowKey="ID"
+        scroll={{ x: 'max-content' }}
+        pagination={pagination ? {
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: pagination.total,
+          onChange: pagination.onChange,
+          showSizeChanger: false,
+          showTotal: (total) => `Total ${total} logs`,
+          responsive: true,
+        } : false}
+        expandable={{
+          expandedRowRender: (record) => renderMetadata(record.Metadata),
+          rowExpandable: (record) => Object.keys(record.Metadata || {}).length > 0,
+        }}
+        size="middle"
+      />
+    </>
   );
 };

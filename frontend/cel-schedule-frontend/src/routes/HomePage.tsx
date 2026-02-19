@@ -125,11 +125,12 @@ export const HomePage: React.FC = () => {
     <div>
       {/* Welcome Section */}
       <Title level={2}>Welcome to CEL Volunteer Tracker</Title>
-      <Paragraph>
+      {user && (<Paragraph>
         Manage volunteer schedules, track attendance, and organize events efficiently.
-      </Paragraph>
+      </Paragraph> )}
 
       {/* Stats Dashboard */}
+      {user && (
       <Row gutter={[16, 16]} style={{ marginTop: 32 }}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
@@ -172,9 +173,12 @@ export const HomePage: React.FC = () => {
           </Card>
         </Col>
       </Row>
+      )}
+      
 
       {/* Quick Actions */}
-      <Card style={{ marginTop: 24 }} title="Quick Actions">
+      {(
+        <Card style={{ marginTop: 24 }} title="Quick Actions">
         <Space wrap>
           {isAdmin && (
             <>
@@ -223,16 +227,12 @@ export const HomePage: React.FC = () => {
               >
                 View All Schedules
               </Button>
-              <Button 
-                icon={<UserOutlined />}
-                onClick={() => user?.volunteerId && navigate(`/volunteers/${user.volunteerId}`)}
-              >
-                My Profile
-              </Button>
             </>
           )}
         </Space>
       </Card>
+      )}
+      
 
       {/* Today's Events Section */}
       {todaysEvents.length > 0 && (

@@ -78,13 +78,35 @@ export const SchedulesPage: React.FC = () => {
   const loading = eventsLoading || deptsLoading;
 
   return (
-    <div>
+    <div style={{ padding: '0 8px' }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .schedules-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+          }
+          .schedules-header h2 {
+            font-size: 20px !important;
+            margin-bottom: 12px !important;
+          }
+          .schedules-actions {
+            width: 100%;
+            justify-content: space-between;
+          }
+        }
+        @media (max-width: 576px) {
+          .schedules-header h2 {
+            font-size: 18px !important;
+          }
+        }
+      `}</style>
+      
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: '16px' }}>
+      <div className="schedules-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: '16px' }}>
         <Title level={2} style={{ margin: 0 }}>
           <CalendarOutlined /> Event Schedules
         </Title>
-        <Space>
+        <Space className="schedules-actions" wrap>
           <ViewModeSelector value={viewMode} onChange={setViewMode} />
           {isAdmin && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>

@@ -1,20 +1,17 @@
 import apiClient from './client';
+import { firestoreService } from '../services/firestore';
 import { Department, DepartmentCreateDTO, DepartmentUpdateDTO, AddMemberDTO, UpdateMemberDTO, StatusHistoryItem } from '../types';
 import type { LogListResponse } from '../types/log';
 
 export const departmentsApi = {
-  // Get all departments
+  // Get all departments - Direct from Firebase (no cold start!)
   async getAll(): Promise<Department[]> {
-    const response = await apiClient.get<Department[]>('/departments');
-    console.log("fetched all departments:", response.data);
-    return response.data;
+    return firestoreService.departments.getAll();
   },
 
-  // Get department by ID
+  // Get department by ID - Direct from Firebase (no cold start!)
   async getById(id: string): Promise<Department> {
-    const response = await apiClient.get<Department>(`/departments/${id}`);
-    console.log("fetched department by id:", response.data);
-    return response.data;
+    return firestoreService.departments.getById(id);
   },
 
   // Get department status history
