@@ -145,8 +145,9 @@ export const Header: React.FC = () => {
             }}
           />
         </Tooltip>
-
-        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+        {
+          user && (
+          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -178,6 +179,9 @@ export const Header: React.FC = () => {
             </span>
           </div>
         </Dropdown>
+          )
+        }
+        
       </div>
     </AntHeader>
   );
