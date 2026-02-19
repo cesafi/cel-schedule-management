@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Segmented } from 'antd';
 import { TableOutlined, CalendarOutlined, AppstoreOutlined } from '@ant-design/icons';
 
@@ -12,6 +12,20 @@ interface ViewModeSelectorProps {
 }
 
 export const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({ value, onChange }) => {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 576px)');
+    setIsMobile(mediaQuery.matches);
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+  
   const handleChange = (mode: string | number) => {
     const newMode = mode as ViewMode;
     onChange(newMode);
@@ -29,17 +43,17 @@ export const ViewModeSelector: React.FC<ViewModeSelectorProps> = ({ value, onCha
       onChange={handleChange}
       options={[
         {
-          label: 'Table',
+          label: isMobile ? undefined : 'Table',
           value: 'table',
           icon: <TableOutlined />,
         },
         {
-          label: 'Calendar',
+          label: isMobile ? undefined : 'Calendar',
           value: 'calendar',
           icon: <CalendarOutlined />,
         },
         {
-          label: 'Cards',
+          label: isMobile ? undefined : 'Cards',
           value: 'cards',
           icon: <AppstoreOutlined />,
         },
