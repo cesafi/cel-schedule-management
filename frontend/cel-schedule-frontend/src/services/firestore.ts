@@ -130,15 +130,25 @@ export const firestoreService = {
   departments: {
     async getAll(): Promise<Department[]> {
       try {
+        console.log('[Firestore] Fetching all departments from collection:', COLLECTIONS.departments);
+        
         const q = query(
           collection(db, COLLECTIONS.departments),
           where('IsDisabled', '==', false)
         );
         const snapshot = await getDocs(q);
-        const departments = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...convertFirestoreData(doc.data())
-        })) as Department[];
+        
+        console.log('[Firestore] Found', snapshot.docs.length, 'departments');
+        
+        const departments = snapshot.docs.map(doc => {
+          const dept = {
+            id: doc.id,
+            ...convertFirestoreData(doc.data())
+          } as Department;
+          console.log('[Firestore] Department ID:', doc.id, 'Name:', dept.departmentName);
+          return dept;
+        });
+        
         // Sort in-memory until indexes are ready
         return departments.sort((a, b) => (a.departmentName || '').localeCompare(b.departmentName || ''));
       } catch (error) {
@@ -149,19 +159,36 @@ export const firestoreService = {
 
     async getById(id: string): Promise<Department> {
       try {
+        console.log('[Firestore] Fetching department with ID:', id);
+        console.log('[Firestore] Collection path:', COLLECTIONS.departments);
+        
         const docRef = doc(db, COLLECTIONS.departments, id);
         const docSnap = await getDoc(docRef);
         
+        console.log('[Firestore] Document exists:', docSnap.exists());
+        
         if (!docSnap.exists()) {
-          throw new Error('Department not found');
+          console.error('[Firestore] Department document not found. ID:', id);
+          throw new Error(`Department not found with ID: ${id}`);
         }
 
-        return {
+        const rawData = docSnap.data();
+        console.log('[Firestore] Raw document data:', rawData);
+        
+        const converted = {
           id: docSnap.id,
-          ...convertFirestoreData(docSnap.data())
+          ...convertFirestoreData(rawData)
         } as Department;
+        
+        console.log('[Firestore] Converted department:', converted);
+        
+        return converted;
       } catch (error) {
-        console.error(`Error fetching department ${id} from Firestore:`, error);
+        console.error(`[Firestore] Error fetching department ${id}:`, error);
+        if (error instanceof Error) {
+          console.error('[Firestore] Error message:', error.message);
+          console.error('[Firestore] Error stack:', error.stack);
+        }
         throw error;
       }
     },
