@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col } from 'antd';
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
-import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO, EventSchedule } from '../../types';
+import { Department, Volunteer, MembershipType, AddMemberDTO, EventSchedule } from '../../types';
 import { format } from 'date-fns';
 import { AddMemberModal } from './modals/AddMemberModal';
 import { useAuth } from '../auth';
@@ -17,7 +17,7 @@ export const DepartmentDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, isHeadOfDepartment } = useAuth();
   const [department, setDepartment] = useState<Department | null>(null);
-  const [history, setHistory] = useState<StatusHistoryItem[]>([]);
+  const [history, setHistory] = useState<EventSchedule[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -241,8 +241,8 @@ export const DepartmentDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'eventName',
-      key: 'eventName',
+      dataIndex: 'name',
+      key: 'name',
     },
     {
       title: 'Date',
@@ -251,10 +251,19 @@ export const DepartmentDetailPage: React.FC = () => {
       render: (date: string) => format(new Date(date), 'MMM dd, yyyy HH:mm'),
     },
     {
+      title: 'Check-ins',
+      key: 'checkIns',
+      render: (_: unknown, record: EventSchedule) => {
+        const deptMemberIds = department.volunteerMembers?.map(m => m.volunteerID) || [];
+        const checkedIn = (record.statuses || []).filter(s => deptMemberIds.includes(s.volunteerID)).length;
+        return `${checkedIn} / ${deptMemberIds.length}`;
+      },
+    },
+    {
       title: 'Actions',
       key: 'actions',
-      render: (_: unknown, record: StatusHistoryItem) => (
-        <Button type="link" onClick={() => navigate(`/events/${record.eventId}`)}>
+      render: (_: unknown, record: EventSchedule) => (
+        <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
           View Event
         </Button>
       ),
@@ -428,7 +437,7 @@ export const DepartmentDetailPage: React.FC = () => {
             style={{ marginTop: 16 }}
             columns={historyColumns}
             dataSource={filteredHistory}
-            rowKey="eventId"
+            rowKey="id"
             pagination={{ pageSize: 10 }}
           />
         </Card>

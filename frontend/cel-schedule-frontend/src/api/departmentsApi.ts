@@ -1,7 +1,8 @@
 import apiClient from './client';
 import { firestoreService } from '../services/firestore';
-import { Department, DepartmentCreateDTO, DepartmentUpdateDTO, AddMemberDTO, UpdateMemberDTO, StatusHistoryItem } from '../types';
+import { Department, DepartmentCreateDTO, DepartmentUpdateDTO, AddMemberDTO, UpdateMemberDTO } from '../types';
 import type { LogListResponse } from '../types/log';
+import type { EventSchedule } from '../types/event';
 
 export const departmentsApi = {
   // Get all departments - Direct from Firebase (no cold start!)
@@ -14,9 +15,9 @@ export const departmentsApi = {
     return firestoreService.departments.getById(id);
   },
 
-  // Get department status history
-  async getStatusHistory(id: string): Promise<StatusHistoryItem[]> {
-    const response = await apiClient.get<StatusHistoryItem[]>(`/departments/${id}/status-history`);
+  // Get department status history — returns full EventSchedule[] (each event with all member statuses)
+  async getStatusHistory(id: string): Promise<EventSchedule[]> {
+    const response = await apiClient.get<EventSchedule[]>(`/departments/${id}/status-history`);
     console.log("fetched status history for department:", response.data);
     return response.data;
   },
