@@ -29,6 +29,7 @@ export const EventDetailPage: React.FC = () => {
   const [timeInForm] = Form.useForm();
   const [timeOutForm] = Form.useForm();
   const [filterDepartment, setFilterDepartment] = useState<string | null>(null);
+  const [filterVolunteerSearch, setFilterVolunteerSearch] = useState('');
   const [logPage, setLogPage] = useState(1);
   const logPageSize = 20;
   const [filterTimeIn, setFilterTimeIn] = useState<string | null>(null);
@@ -262,6 +263,12 @@ export const EventDetailPage: React.FC = () => {
               <Form.Item name="timeIn" style={{ marginBottom: 0 }}>
                 <Input type="time" placeholder="Time" style={{ width: 100 }} />
               </Form.Item>
+              <Button
+                size="small"
+                onClick={() => timeInForm.setFieldsValue({ timeIn: format(new Date(), 'HH:mm') })}
+              >
+                Now
+              </Button>
               <Button type="primary" size="small" htmlType="submit">
                 Submit
               </Button>
@@ -347,6 +354,12 @@ export const EventDetailPage: React.FC = () => {
               <Form.Item name="timeOut" style={{ marginBottom: 0 }}>
                 <Input type="time" placeholder="Time" style={{ width: 100 }} />
               </Form.Item>
+              <Button
+                size="small"
+                onClick={() => timeOutForm.setFieldsValue({ timeOut: format(new Date(), 'HH:mm') })}
+              >
+                Now
+              </Button>
               <Button type="primary" size="small" htmlType="submit">
                 Submit
               </Button>
@@ -501,7 +514,15 @@ export const EventDetailPage: React.FC = () => {
   const filteredAttendance = useMemo(() => {
     if (!event) return [];
     
+    const searchTerm = filterVolunteerSearch.trim().toLowerCase();
+
     return (event.statuses || []).filter((record) => {
+      // Filter by volunteer name search
+      if (searchTerm) {
+        const name = volunteerMap.get(record.volunteerID)?.name?.toLowerCase() ?? '';
+        if (!name.includes(searchTerm)) return false;
+      }
+
       // Filter by department
       if (filterDepartment) {
         const volunteerDepts = getVolunteerDepartments(record.volunteerID);
@@ -526,7 +547,7 @@ export const EventDetailPage: React.FC = () => {
 
       return true;
     });
-  }, [event, filterDepartment, filterTimeIn, filterTimeOut, getVolunteerDepartments]);
+  }, [event, filterVolunteerSearch, filterDepartment, filterTimeIn, filterTimeOut, getVolunteerDepartments, volunteerMap]);
 
   // Unused for now - TODO: implement volunteer table feature
   // const scheduledVolunteerColumns = [
@@ -637,6 +658,13 @@ export const EventDetailPage: React.FC = () => {
                 <>
                   <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <Space wrap>
+                      <Input.Search
+                        placeholder="Search volunteer..."
+                        allowClear
+                        value={filterVolunteerSearch}
+                        onChange={e => setFilterVolunteerSearch(e.target.value)}
+                        style={{ width: 200 }}
+                      />
                       <Select
                         placeholder="Filter by Department"
                         style={{ width: 200 }}
@@ -753,7 +781,8 @@ export const EventDetailPage: React.FC = () => {
       {/* Add Volunteer Modal */}
       <AddVolunteerToEventModal
         open={addVolunteerModalOpen}
-        availableVolunteers={volunteers.filter((v: Volunteer) => !v.isDisabled && !event.statuses?.some(s => s.volunteerID === v.id))}
+        allVolunteers={volunteers.filter((v: Volunteer) => !v.isDisabled)}
+        assignedVolunteerIds={event.statuses?.map(s => s.volunteerID) || []}
         departments={departments}
         onCancel={() => setAddVolunteerModalOpen(false)}
         onSubmit={handleAddVolunteersToAttendance}

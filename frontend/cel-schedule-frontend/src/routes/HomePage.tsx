@@ -10,7 +10,8 @@ import {
   Segmented, 
   Empty,
   Spin,
-  InputNumber
+  InputNumber,
+  Input
 } from 'antd';
 import { 
   CalendarOutlined, 
@@ -42,6 +43,7 @@ export const HomePage: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('My Events');
   const [daysBefore, setDaysBefore] = useState<number>(10);
   const [daysAfter, setDaysAfter] = useState<number>(10);
+  const [volunteerSearch, setVolunteerSearch] = useState('');
 
   // Fetch data using React Query hooks
   const { data: allEvents = [], isLoading: eventsLoading } = useEvents();
@@ -121,6 +123,24 @@ export const HomePage: React.FC = () => {
       return isAssignedVolunteer || isDeptHeadOfEvent;
     });
   }, [viewMode, relevantEvents, isAuthenticated, user, isDeptHead, userDepartments]);
+
+  // Build volunteer id -> name map for search
+  const volunteerNameMap = useMemo(() => {
+    return new Map(volunteers.map(v => [v.id, v.name.toLowerCase()]));
+  }, [volunteers]);
+
+  // Apply volunteer name search on top of filteredEvents (timeline only)
+  const searchedTimelineEvents = useMemo(() => {
+    if (!volunteerSearch.trim()) return filteredEvents;
+    const term = volunteerSearch.trim().toLowerCase();
+    return filteredEvents.filter(event => {
+      const allVolunteerIds = [
+        ...(event.scheduledVolunteers || []),
+        ...(event.voluntaryVolunteers || []),
+      ];
+      return allVolunteerIds.some(vid => volunteerNameMap.get(vid)?.includes(term));
+    });
+  }, [filteredEvents, volunteerSearch, volunteerNameMap]);
 
   const handleQuickCheckIn = (eventId: string) => {
     navigate(`/events/${eventId}`);
@@ -293,7 +313,7 @@ export const HomePage: React.FC = () => {
                   addonBefore="Past"
                   addonAfter="days"
                   size="small"
-                  style={{ width: 120 }}
+                  style={{ width: 130 }}
                 />
                 <InputNumber
                   min={MIN_DAYS}
@@ -303,7 +323,7 @@ export const HomePage: React.FC = () => {
                   addonBefore="Future"
                   addonAfter="days"
                   size="small"
-                  style={{ width: 120 }}
+                  style={{ width: 130 }}
                 />
               </Space>
             </Space>
@@ -317,16 +337,25 @@ export const HomePage: React.FC = () => {
           </div>
         }
       >
-        {filteredEvents.length === 0 ? (
+        <Input.Search
+          placeholder="Search by volunteer name..."
+          allowClear
+          value={volunteerSearch}
+          onChange={(e) => setVolunteerSearch(e.target.value)}
+          style={{ marginBottom: 16, maxWidth: 320 }}
+        />
+        {searchedTimelineEvents.length === 0 ? (
           <Empty 
             description={
-              viewMode === 'My Events' 
-                ? "No events assigned to you in this time range" 
-                : "No events scheduled in this time range"
+              volunteerSearch.trim()
+                ? `No events found with a volunteer matching "${volunteerSearch}"`
+                : viewMode === 'My Events'
+                  ? "No events assigned to you in this time range"
+                  : "No events scheduled in this time range"
             }
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           >
-            {isAdmin && (
+            {isAdmin && !volunteerSearch.trim() && (
               <Button type="primary" onClick={() => navigate('/schedules')}>
                 Create New Event
               </Button>
@@ -334,7 +363,7 @@ export const HomePage: React.FC = () => {
           </Empty>
         ) : (
           <Row gutter={[16, 16]}>
-            {filteredEvents.map(event => (
+            {searchedTimelineEvents.map(event => (
               <Col xs={24} sm={12} lg={8} key={event.id}>
                 <EventCard
                   event={event}
