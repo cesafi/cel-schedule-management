@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { volunteersApi } from '../api';
 import { VolunteerAnalytics } from '../types';
-import { EventSchedule, ScheduleStatus } from '../types/event';
+import { EventSchedule } from '../types/event';
 import {
   calculateAttendanceRate,
   calculatePunctualityRate,
@@ -12,7 +12,6 @@ import {
   TrendDataPoint,
   AttendanceDistribution,
 } from '../utils/analytics';
-import { AttendanceType } from '../types/enums';
 
 interface UseVolunteerAnalyticsReturn {
   stats: VolunteerAnalytics | null;
@@ -23,69 +22,55 @@ interface UseVolunteerAnalyticsReturn {
 }
 
 export function useVolunteerAnalytics(volunteerId: string): UseVolunteerAnalyticsReturn {
-  // Fetch volunteer status history
-  const { data: statusHistory, isLoading, error } = useQuery({
+  // Backend returns EventSchedule[] — each event where this volunteer has a status entry
+  const { data: events = [], isLoading, error } = useQuery<EventSchedule[]>({
     queryKey: ['volunteer-status-history', volunteerId],
     queryFn: () => volunteersApi.getStatusHistory(volunteerId),
     enabled: !!volunteerId,
   });
 
-  // Convert StatusHistoryItem[] to EventSchedule[] format for analytics functions
-  const events = useMemo((): EventSchedule[] => {
-    if (!statusHistory) return [];
+  // Extract only this volunteer's own statuses from each event
+  const ownStatuses = useMemo(
+    () => events.flatMap(e =>
+      (e.statuses || []).filter(s => s.volunteerID === volunteerId),
+    ),
+    [events, volunteerId],
+  );
 
-    return statusHistory
-      .filter(item => item.status) // Filter out items without status
-      .map(item => ({
-        id: item.eventId,
-        name: item.eventName,
-        description: '',
-        timeAndDate: item.timeAndDate,
-        scheduledVolunteers: [],
-        voluntaryVolunteers: [],
-        assignedGroups: [],
-        statuses: [{
-          volunteerID: volunteerId,
-          timeIn: item.status.timeIn,
-          timeOut: item.status.timeOut,
-          attendanceType: item.status.attendanceType as AttendanceType | undefined,
-        }] as ScheduleStatus[],
-        createdAt: '',
-        updatedAt: '',
-        isDisabled: false,
-      }));
-  }, [statusHistory, volunteerId]);
-
-  // Calculate all statistics
   const stats = useMemo((): VolunteerAnalytics | null => {
     if (!events.length) return null;
 
-    const allStatuses = events.flatMap(e => e.statuses || []);
-    const distribution = getAttendanceDistribution(allStatuses);
+    const distribution = getAttendanceDistribution(ownStatuses);
 
     return {
       totalEvents: events.length,
-      attendanceRate: calculateAttendanceRate(allStatuses),
-      punctualityRate: calculatePunctualityRate(allStatuses),
+      attendanceRate: calculateAttendanceRate(ownStatuses),
+      punctualityRate: calculatePunctualityRate(ownStatuses),
       presentCount: distribution.present,
       lateCount: distribution.late,
       excusedCount: distribution.excused,
       absentCount: distribution.absent,
-      currentStreak: calculateAttendanceStreak(events),
-      upcomingEventsCount: 0, // This will be calculated separately with useUpcomingEvents
+      currentStreak: calculateAttendanceStreak(events.map(e => ({
+        ...e,
+        statuses: (e.statuses || []).filter(s => s.volunteerID === volunteerId),
+      }))),
+      upcomingEventsCount: 0, // Handled separately by useUpcomingEvents
     };
-  }, [events]);
+  }, [events, ownStatuses, volunteerId]);
 
   const distribution = useMemo((): AttendanceDistribution | null => {
     if (!events.length) return null;
-    const allStatuses = events.flatMap(e => e.statuses || []);
-    return getAttendanceDistribution(allStatuses);
-  }, [events]);
+    return getAttendanceDistribution(ownStatuses);
+  }, [events, ownStatuses]);
 
   const trendData = useMemo((): TrendDataPoint[] => {
     if (!events.length) return [];
-    return groupStatusesByMonth(events);
-  }, [events]);
+    // Pass events with only this volunteer's statuses for correct per-month counts
+    return groupStatusesByMonth(events.map(e => ({
+      ...e,
+      statuses: (e.statuses || []).filter(s => s.volunteerID === volunteerId),
+    })));
+  }, [events, volunteerId]);
 
   return {
     stats,

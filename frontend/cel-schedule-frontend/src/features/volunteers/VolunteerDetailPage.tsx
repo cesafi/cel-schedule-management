@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Tabs, Row, Col } from 'antd';
 import { ArrowLeftOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FireOutlined, FileTextOutlined } from '@ant-design/icons';
 import { volunteersApi } from '../../api';
-import { Volunteer, StatusHistoryItem, Department, MembershipType, EventSchedule } from '../../types';
+import { Volunteer, Department, MembershipType, EventSchedule } from '../../types';
 import { format } from 'date-fns';
 import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
 import { useVolunteerAnalytics, useUpcomingEvents, useDepartments, useEntityLogs } from '../../hooks';
@@ -17,7 +17,7 @@ export const VolunteerDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const [volunteer, setVolunteer] = useState<Volunteer | null>(null);
-  const [history, setHistory] = useState<StatusHistoryItem[]>([]);
+  const [history, setHistory] = useState<EventSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -90,7 +90,10 @@ export const VolunteerDetailPage: React.FC = () => {
     
     // Filter by attendance type
     if (attendanceFilter !== 'ALL') {
-      filtered = filtered.filter(item => item.status.attendanceType === attendanceFilter);
+      filtered = filtered.filter(item => {
+        const ownStatus = (item.statuses || []).find(s => s.volunteerID === id);
+        return ownStatus?.attendanceType === attendanceFilter;
+      });
     }
     
     return filtered;
@@ -111,8 +114,8 @@ export const VolunteerDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'eventName',
-      key: 'eventName',
+      dataIndex: 'name',
+      key: 'name',
     },
     {
       title: 'Date',
@@ -122,9 +125,10 @@ export const VolunteerDetailPage: React.FC = () => {
     },
     {
       title: 'Attendance',
-      dataIndex: ['status', 'attendanceType'],
       key: 'attendanceType',
-      render: (type: string) => {
+      render: (_: unknown, record: EventSchedule) => {
+        const ownStatus = (record.statuses || []).find(s => s.volunteerID === id);
+        const type = ownStatus?.attendanceType;
         const colors: Record<string, string> = {
           PRESENT: 'green',
           LATE: 'orange',
@@ -136,21 +140,25 @@ export const VolunteerDetailPage: React.FC = () => {
     },
     {
       title: 'Time In',
-      dataIndex: ['status', 'timeIn'],
       key: 'timeIn',
-      render: (time: string) => time ? format(new Date(time), 'HH:mm') : '-',
+      render: (_: unknown, record: EventSchedule) => {
+        const ownStatus = (record.statuses || []).find(s => s.volunteerID === id);
+        return ownStatus?.timeIn ? format(new Date(ownStatus.timeIn), 'HH:mm') : '-';
+      },
     },
     {
       title: 'Time Out',
-      dataIndex: ['status', 'timeOut'],
       key: 'timeOut',
-      render: (time: string) => time ? format(new Date(time), 'HH:mm') : '-',
+      render: (_: unknown, record: EventSchedule) => {
+        const ownStatus = (record.statuses || []).find(s => s.volunteerID === id);
+        return ownStatus?.timeOut ? format(new Date(ownStatus.timeOut), 'HH:mm') : '-';
+      },
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: unknown, record: StatusHistoryItem) => (
-        <Button type="link" onClick={() => navigate(`/events/${record.eventId}`)}>
+      render: (_: unknown, record: EventSchedule) => (
+        <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
           View Event
         </Button>
       ),
@@ -397,7 +405,7 @@ export const VolunteerDetailPage: React.FC = () => {
           <Table
             columns={historyColumns}
             dataSource={filteredHistory}
-            rowKey="eventId"
+            rowKey="id"
             pagination={{ pageSize: 10 }}
             locale={{ emptyText: 'No attendance records match the current filters' }}
           />

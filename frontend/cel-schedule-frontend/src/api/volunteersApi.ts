@@ -1,7 +1,8 @@
 import apiClient from './client';
 import { firestoreService } from '../services/firestore';
-import { Volunteer, VolunteerCreateDTO, VolunteerUpdateDTO, StatusHistoryItem } from '../types';
+import { Volunteer, VolunteerCreateDTO, VolunteerUpdateDTO } from '../types';
 import type { LogListResponse } from '../types/log';
+import type { EventSchedule } from '../types/event';
 
 export const volunteersApi = {
   // Get all volunteers - Direct from Firebase (no cold start!)
@@ -14,9 +15,9 @@ export const volunteersApi = {
     return firestoreService.volunteers.getById(id);
   },
 
-  // Get volunteer status history
-  async getStatusHistory(id: string): Promise<StatusHistoryItem[]> {
-    const response = await apiClient.get<StatusHistoryItem[]>(`/volunteers/${id}/status-history`);
+  // Get volunteer status history — returns full EventSchedule[] (events where this volunteer has a status)
+  async getStatusHistory(id: string): Promise<EventSchedule[]> {
+    const response = await apiClient.get<EventSchedule[]>(`/volunteers/${id}/status-history`);
     console.log("fetched volunteer status history:", response.data);
     return response.data;
   },
