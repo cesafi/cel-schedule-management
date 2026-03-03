@@ -58,8 +58,8 @@ func (h *AuthUserHandler) Create(c *gin.Context) {
 		Username:    input.Username,
 		Password:    hashedPassword,
 		AccessLevel: models.AuthLevel(input.AccessLevel),
-		CreatedAt:   time.Now(),
-		LastUpdated: time.Now(),
+		CreatedAt:   time.Now().UTC(),
+		LastUpdated: time.Now().UTC(),
 		IsDisabled:  false,
 	}
 
@@ -141,7 +141,7 @@ func (h *AuthUserHandler) Update(c *gin.Context) {
 		}
 	}
 
-	user.LastUpdated = time.Now()
+	user.LastUpdated = time.Now().UTC()
 
 	if err := h.db.AuthUsers().UpdateUser(c.Request.Context(), user); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -238,7 +238,7 @@ func (h *AuthUserHandler) Login(c *gin.Context) {
 
 	// Calculate expiration time (24 hours default)
 	expirationHours := 24
-	expiresAt := time.Now().Add(time.Duration(expirationHours) * time.Hour)
+	expiresAt := time.Now().UTC().Add(time.Duration(expirationHours) * time.Hour)
 
 	// Log successful login
 	utils.CreateAuditLogWithUserInfo(c.Request.Context(), h.db, sub_model.USER_LOGIN, user.ID, user.Username, map[string]interface{}{

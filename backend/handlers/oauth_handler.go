@@ -98,10 +98,10 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 					RefreshToken: token.RefreshToken,
 					TokenType:    token.TokenType,
 					Expiry:       token.Expiry,
-					LinkedAt:     time.Now(),
+					LinkedAt:     time.Now().UTC(),
 				},
-				CreatedAt:   time.Now(),
-				LastUpdated: time.Now(),
+				CreatedAt:   time.Now().UTC(),
+				LastUpdated: time.Now().UTC(),
 				IsDisabled:  false,
 			}
 
@@ -119,9 +119,9 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 				RefreshToken: token.RefreshToken,
 				TokenType:    token.TokenType,
 				Expiry:       token.Expiry,
-				LinkedAt:     time.Now(),
+				LinkedAt:     time.Now().UTC(),
 			}
-			existingUser.LastUpdated = time.Now()
+			existingUser.LastUpdated = time.Now().UTC()
 
 			err = h.db.AuthUsers().UpdateUser(context.Background(), existingUser)
 			if err != nil {
@@ -136,8 +136,8 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 		existingUser.ThirdAuth.RefreshToken = token.RefreshToken
 		existingUser.ThirdAuth.TokenType = token.TokenType
 		existingUser.ThirdAuth.Expiry = token.Expiry
-		existingUser.ThirdAuth.LinkedAt = time.Now()
-		existingUser.LastUpdated = time.Now()
+		existingUser.ThirdAuth.LinkedAt = time.Now().UTC()
+		existingUser.LastUpdated = time.Now().UTC()
 
 		err = h.db.AuthUsers().UpdateUser(context.Background(), existingUser)
 		if err != nil {
@@ -172,7 +172,7 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 		UserID:      authUser.ID,
 		Username:    authUser.Username,
 		AccessLevel: int(authUser.AccessLevel),
-		ExpiresAt:   time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+		ExpiresAt:   time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339),
 		IsNewUser:   isNewUser,
 	})
 }
@@ -254,9 +254,9 @@ func (h *OAuthHandler) LinkGoogleAccount(c *gin.Context) {
 		RefreshToken: token.RefreshToken,
 		TokenType:    token.TokenType,
 		Expiry:       token.Expiry,
-		LinkedAt:     time.Now(),
+		LinkedAt:     time.Now().UTC(),
 	}
-	user.LastUpdated = time.Now()
+	user.LastUpdated = time.Now().UTC()
 
 	err = h.db.AuthUsers().UpdateUser(context.Background(), user)
 	if err != nil {

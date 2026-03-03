@@ -115,8 +115,8 @@ func (h *BatchImportHandler) PreviewBatchImport(c *gin.Context) {
 	session := &dtos.ImportSession{
 		SessionID:   sessionID,
 		Departments: departments,
-		CreatedAt:   time.Now(),
-		ExpiresAt:   time.Now().Add(30 * time.Minute), // 30 min expiry
+		CreatedAt:   time.Now().UTC(),
+		ExpiresAt:   time.Now().UTC().Add(30 * time.Minute), // 30 min expiry
 	}
 
 	h.mu.Lock()
@@ -470,8 +470,8 @@ func (h *BatchImportHandler) createVolunteers(ctx context.Context, departments [
 				volunteer := &models.VolunteerModel{
 					ID:          uuid.New().String(),
 					Name:        originalName,
-					CreatedAt:   time.Now(),
-					LastUpdated: time.Now(),
+					CreatedAt:   time.Now().UTC(),
+					LastUpdated: time.Now().UTC(),
 					IsDisabled:  false,
 				}
 				if err := h.db.Volunteers().CreateVolunteer(ctx, volunteer); err != nil {
@@ -489,8 +489,8 @@ func (h *BatchImportHandler) createVolunteers(ctx context.Context, departments [
 			volunteer := &models.VolunteerModel{
 				ID:          uuid.New().String(),
 				Name:        originalName,
-				CreatedAt:   time.Now(),
-				LastUpdated: time.Now(),
+				CreatedAt:   time.Now().UTC(),
+				LastUpdated: time.Now().UTC(),
 				IsDisabled:  false,
 			}
 			if err := h.db.Volunteers().CreateVolunteer(ctx, volunteer); err != nil {
@@ -525,8 +525,8 @@ func (h *BatchImportHandler) createVolunteers(ctx context.Context, departments [
 				volunteer := &models.VolunteerModel{
 					ID:          uuid.New().String(),
 					Name:        fmt.Sprintf("%s (%s)", vol.name, dept.DepartmentName),
-					CreatedAt:   time.Now(),
-					LastUpdated: time.Now(),
+					CreatedAt:   time.Now().UTC(),
+					LastUpdated: time.Now().UTC(),
 					IsDisabled:  false,
 				}
 				if err := h.db.Volunteers().CreateVolunteer(ctx, volunteer); err != nil {
@@ -564,9 +564,9 @@ func (h *BatchImportHandler) createDepartments(ctx context.Context, departments 
 		members := []sub_model.MembershipInfo{
 			{
 				VolunteerID:    headID,
-				JoinedDate:     time.Now(),
+				JoinedDate:     time.Now().UTC(),
 				MembershipType: string(sub_model.HEAD),
-				LastUpdated:    time.Now(),
+				LastUpdated:    time.Now().UTC(),
 			},
 		}
 
@@ -585,9 +585,9 @@ func (h *BatchImportHandler) createDepartments(ctx context.Context, departments 
 
 			members = append(members, sub_model.MembershipInfo{
 				VolunteerID:    memberID,
-				JoinedDate:     time.Now(),
+				JoinedDate:     time.Now().UTC(),
 				MembershipType: string(sub_model.MEMBER),
-				LastUpdated:    time.Now(),
+				LastUpdated:    time.Now().UTC(),
 			})
 		}
 
@@ -596,8 +596,8 @@ func (h *BatchImportHandler) createDepartments(ctx context.Context, departments 
 			ID:               uuid.New().String(),
 			DepartmentName:   deptPreview.DepartmentName,
 			VolunteerMembers: members,
-			CreatedAt:        time.Now(),
-			LastUpdated:      time.Now(),
+			CreatedAt:        time.Now().UTC(),
+			LastUpdated:      time.Now().UTC(),
 			IsDisabled:       false,
 		}
 
@@ -617,7 +617,7 @@ func (h *BatchImportHandler) cleanupExpiredSessions() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		now := time.Now()
+		now := time.Now().UTC()
 		h.mu.Lock()
 		for sessionID, session := range h.sessions {
 			if now.After(session.ExpiresAt) {

@@ -49,7 +49,7 @@ func GenerateJWT(userID, username string, accessLevel int) (string, error) {
 		}
 	}
 
-	expirationTime := time.Now().Add(time.Duration(expirationHours) * time.Hour)
+	expirationTime := time.Now().UTC().Add(time.Duration(expirationHours) * time.Hour)
 
 	claims := &JWTClaims{
 		UserID:      userID,
@@ -57,7 +57,7 @@ func GenerateJWT(userID, username string, accessLevel int) (string, error) {
 		AccessLevel: accessLevel,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 			Issuer:    "cel-scheduling-system",
 		},
 	}

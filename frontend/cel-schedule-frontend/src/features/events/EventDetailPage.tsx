@@ -68,8 +68,14 @@ export const EventDetailPage: React.FC = () => {
     if (!id) return;
     
     try {
+      const buildLocalISOString = (timeStr: string): string => {
+        const now = new Date();
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const local = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        return local.toISOString();
+      };
       const data: TimeInDTO = {
-        timeIn: values.timeIn ? `${new Date().toISOString().split('T')[0]}T${values.timeIn}:00Z` : undefined,
+        timeIn: values.timeIn ? buildLocalISOString(values.timeIn) : undefined,
         timeInType: values.attendanceType || AttendanceType.PRESENT,
       };
       await eventsApi.timeIn(id, volunteerId, data);
@@ -87,8 +93,14 @@ export const EventDetailPage: React.FC = () => {
     if (!id) return;
     
     try {
+      const buildLocalISOString = (timeStr: string): string => {
+        const now = new Date();
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const local = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        return local.toISOString();
+      };
       const data: TimeOutDTO = {
-        timeOut: values.timeOut ? `${new Date().toISOString().split('T')[0]}T${values.timeOut}:00Z` : undefined,
+        timeOut: values.timeOut ? buildLocalISOString(values.timeOut) : undefined,
         timeOutType: 'On-Time',
       };
       await eventsApi.timeOut(id, volunteerId, data);

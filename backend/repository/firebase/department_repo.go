@@ -145,13 +145,13 @@ func (r *departmentRepo) AddMemberToDepartment(ctx context.Context, departmentID
 
 	// Set joined date and last updated if not provided
 	if memberInfo.JoinedDate.IsZero() {
-		memberInfo.JoinedDate = time.Now()
+		memberInfo.JoinedDate = time.Now().UTC()
 	}
-	memberInfo.LastUpdated = time.Now()
+	memberInfo.LastUpdated = time.Now().UTC()
 
 	// Add the new member
 	dept.VolunteerMembers = append(dept.VolunteerMembers, *memberInfo)
-	dept.LastUpdated = time.Now()
+	dept.LastUpdated = time.Now().UTC()
 
 	// Update the department
 	if err := r.UpdateDepartment(ctx, dept); err != nil {
@@ -174,7 +174,7 @@ func (r *departmentRepo) UpdateMemberType(ctx context.Context, departmentID stri
 	for i, member := range dept.VolunteerMembers {
 		if member.VolunteerID == volunteerID {
 			dept.VolunteerMembers[i].MembershipType = newType
-			dept.VolunteerMembers[i].LastUpdated = time.Now()
+			dept.VolunteerMembers[i].LastUpdated = time.Now().UTC()
 			found = true
 			break
 		}
@@ -184,7 +184,7 @@ func (r *departmentRepo) UpdateMemberType(ctx context.Context, departmentID stri
 		return fmt.Errorf("volunteer %s not found in department %s", volunteerID, departmentID)
 	}
 
-	dept.LastUpdated = time.Now()
+	dept.LastUpdated = time.Now().UTC()
 
 	// Update the department
 	if err := r.UpdateDepartment(ctx, dept); err != nil {
@@ -218,7 +218,7 @@ func (r *departmentRepo) RemoveMemberFromDepartment(ctx context.Context, departm
 	}
 
 	dept.VolunteerMembers = newMembers
-	dept.LastUpdated = time.Now()
+	dept.LastUpdated = time.Now().UTC()
 
 	// Update the department
 	if err := r.UpdateDepartment(ctx, dept); err != nil {
