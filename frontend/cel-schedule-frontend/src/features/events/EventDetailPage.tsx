@@ -628,7 +628,7 @@ export const EventDetailPage: React.FC = () => {
 
       <Card style={{ marginTop: 24 }}>
         <Tabs
-          defaultActiveKey="departments"
+          defaultActiveKey="attendance"
           items={[
             {
               key: 'attendance',

@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     storage.clear();
     setUser(null);
-    window.location.href = '/login';
+    window.location.href = '/';
   };
 
   const setTokenHelper = (token: string) => {

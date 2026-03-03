@@ -165,7 +165,7 @@ export const useEventFilters = (events: EventSchedule[] | undefined) => {
       }
 
       return true;
-    });
+    }).sort((a, b) => new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime());
   }, [events, filters]);
 
   // Update individual filter values

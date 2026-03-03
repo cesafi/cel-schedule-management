@@ -9,7 +9,8 @@ import {
   Space, 
   Segmented, 
   Empty,
-  Spin
+  Spin,
+  InputNumber
 } from 'antd';
 import { 
   CalendarOutlined, 
@@ -27,6 +28,11 @@ import { useEvents, useVolunteers, useDepartments } from '../hooks';
 
 const { Title, Paragraph } = Typography;
 
+const DEFAULT_DAYS_BEFORE = 10;
+const DEFAULT_DAYS_AFTER = 10;
+const MIN_DAYS = 0;
+const MAX_DAYS = 365;
+
 type ViewMode = 'My Events' | 'All Events';
 
 export const HomePage: React.FC = () => {
@@ -34,7 +40,9 @@ export const HomePage: React.FC = () => {
   const { user, isAuthenticated, isAdmin, isDeptHead, userDepartments } = useAuth();
   
   const [viewMode, setViewMode] = useState<ViewMode>('My Events');
-  
+  const [daysBefore, setDaysBefore] = useState<number>(10);
+  const [daysAfter, setDaysAfter] = useState<number>(10);
+
   // Fetch data using React Query hooks
   const { data: allEvents = [], isLoading: eventsLoading } = useEvents();
   const { data: volunteers = [], isLoading: volunteersLoading } = useVolunteers(true);
@@ -42,20 +50,29 @@ export const HomePage: React.FC = () => {
 
   const loading = eventsLoading || volunteersLoading || departmentsLoading;
 
-  // Filter events within date range (2 days past to 7 days future) - memoized
+  // Filter events within the user-configurable date range - memoized
   const relevantEvents = useMemo(() => {
     const now = new Date();
-    const twoDaysAgo = subDays(now, 2);
-    const oneWeekFromNow = addDays(now, 7);
+    const rangeStart = subDays(now, daysBefore);
+    const rangeEnd = addDays(now, daysAfter);
 
     return allEvents.filter(event => {
       if (event.isDisabled) return false;
       const eventDate = parseISO(event.timeAndDate);
-      return isAfter(eventDate, twoDaysAgo) && isBefore(eventDate, oneWeekFromNow);
-    }).sort((a, b) => 
-      new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime()
-    );
-  }, [allEvents]);
+      return isAfter(eventDate, rangeStart) && isBefore(eventDate, rangeEnd);
+    }).sort((a, b) => {
+      const now = new Date();
+      const aDate = new Date(a.timeAndDate);
+      const bDate = new Date(b.timeAndDate);
+      const aFuture = aDate >= now;
+      const bFuture = bDate >= now;
+      // Future events come first, sorted ascending (nearest first)
+      if (aFuture && bFuture) return aDate.getTime() - bDate.getTime();
+      // Past events after future, sorted descending (most recent past first)
+      if (!aFuture && !bFuture) return bDate.getTime() - aDate.getTime();
+      return aFuture ? -1 : 1;
+    });
+  }, [allEvents, daysBefore, daysAfter]);
 
   // Calculate statistics - memoized
   const stats = useMemo(() => {
@@ -81,7 +98,7 @@ export const HomePage: React.FC = () => {
 
   // Filter events based on view mode - memoized
   const filteredEvents = useMemo(() => {
-    if (viewMode === 'All Events') {
+    if (!isAuthenticated || viewMode === 'All Events') {
       return relevantEvents;
     }
 
@@ -103,7 +120,7 @@ export const HomePage: React.FC = () => {
 
       return isAssignedVolunteer || isDeptHeadOfEvent;
     });
-  }, [viewMode, relevantEvents, user, isDeptHead, userDepartments]);
+  }, [viewMode, relevantEvents, isAuthenticated, user, isDeptHead, userDepartments]);
 
   const handleQuickCheckIn = (eventId: string) => {
     navigate(`/events/${eventId}`);
@@ -263,13 +280,32 @@ export const HomePage: React.FC = () => {
       <Card 
         style={{ marginTop: 24 }}
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-            <Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <Space wrap>
               <CalendarOutlined />
               <span>Event Timeline</span>
-              <Paragraph type="secondary" style={{ margin: 0, fontSize: '0.9em' }}>
-                (2 days past to 1 week ahead)
-              </Paragraph>
+              <Space size="small">
+                <InputNumber
+                  min={MIN_DAYS}
+                  max={MAX_DAYS}
+                  value={daysBefore}
+                  onChange={(val) => setDaysBefore(val ?? DEFAULT_DAYS_BEFORE)}
+                  addonBefore="Past"
+                  addonAfter="days"
+                  size="small"
+                  style={{ width: 120 }}
+                />
+                <InputNumber
+                  min={MIN_DAYS}
+                  max={MAX_DAYS}
+                  value={daysAfter}
+                  onChange={(val) => setDaysAfter(val ?? DEFAULT_DAYS_AFTER)}
+                  addonBefore="Future"
+                  addonAfter="days"
+                  size="small"
+                  style={{ width: 120 }}
+                />
+              </Space>
             </Space>
             {isAuthenticated && (
               <Segmented
