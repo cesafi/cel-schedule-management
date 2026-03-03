@@ -248,8 +248,10 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
     <>
       <style>{`
         .event-row-today {
-          background-color: #f6ffed !important;
           border-left: 4px solid #52c41a;
+        }
+        .event-row-today > td {
+          background-color: #f6ffed !important;
         }
         .event-row-past {
           opacity: 0.6;
@@ -258,10 +260,10 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
         .event-row-upcoming {
           border-left: 4px solid #1890ff;
         }
-        .event-row-today:hover,
-        .event-row-past:hover,
-        .event-row-upcoming:hover {
-          background-color: #fafafa !important;
+        .event-row-today:hover > td,
+        .event-row-past:hover > td,
+        .event-row-upcoming:hover > td {
+          background-color: #1a1a1a !important;
         }
         
         /* Mobile responsiveness */
