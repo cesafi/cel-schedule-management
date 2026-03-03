@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined, EditOutlined } from '@ant-design/icons';
 import { eventsApi } from '../../api';
-import { Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
+import { Volunteer, Department, AddStatusDTO, EventCreateDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
 import { format } from 'date-fns';
 import { useAuth } from '../auth';
 import { AddVolunteerToEventModal } from './modals/AddVolunteerToEventModal';
 import { AddDepartmentToEventModal } from './modals/AddDepartmentToEventModal';
+import { EventFormModal } from './modals/EventFormModal';
 import { useEvent, useVolunteers, useDepartments, useVolunteerMap, useDepartmentMap, useEntityLogs } from '../../hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { eventKeys } from '../../hooks/useEvents';
@@ -24,6 +25,7 @@ export const EventDetailPage: React.FC = () => {
   
   const [addDeptModalOpen, setAddDeptModalOpen] = useState(false);
   const [addVolunteerModalOpen, setAddVolunteerModalOpen] = useState(false);
+  const [editEventModalOpen, setEditEventModalOpen] = useState(false);
   const [editingTimeIn, setEditingTimeIn] = useState<string | null>(null);
   const [editingTimeOut, setEditingTimeOut] = useState<string | null>(null);
   const [timeInForm] = Form.useForm();
@@ -90,7 +92,7 @@ export const EventDetailPage: React.FC = () => {
     }
   }, [id, refetchEvent, timeInForm]);
 
-  const handleTimeOut = useCallback(async (volunteerId: string, values: { timeOut?: string }) => {
+  const handleTimeOut = useCallback(async (volunteerId: string, values: { timeOut?: string; timeOutType?: TimeOutType }) => {
     if (!id) return;
     
     try {
@@ -102,7 +104,7 @@ export const EventDetailPage: React.FC = () => {
       };
       const data: TimeOutDTO = {
         timeOut: values.timeOut ? buildLocalISOString(values.timeOut) : undefined,
-        timeOutType: 'On-Time',
+        timeOutType: values.timeOutType || TimeOutType.ONTIME,
       };
       await eventsApi.timeOut(id, volunteerId, data);
       message.success('Volunteer checked out successfully');
@@ -241,7 +243,7 @@ export const EventDetailPage: React.FC = () => {
         return new Date(a.timeIn).getTime() - new Date(b.timeIn).getTime();
       },
       render: (time: string, record: StatusRecord) => {
-        if (!record.attendanceType && editingTimeIn === record.volunteerID) {
+        if (editingTimeIn === record.volunteerID) {
           return (
             <Form
               form={timeInForm}
@@ -331,7 +333,7 @@ export const EventDetailPage: React.FC = () => {
         return new Date(a.timeOut).getTime() - new Date(b.timeOut).getTime();
       },
       render: (time: string, record: StatusRecord) => {
-        if (!record.timeOutType && editingTimeOut === record.volunteerID) {
+        if (editingTimeOut === record.volunteerID) {
           return (
             <Form
               form={timeOutForm}
@@ -585,6 +587,20 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
+  const handleEditEvent = async (data: EventCreateDTO) => {
+    if (!id) return;
+    try {
+      await eventsApi.update(id, data);
+      message.success('Event updated successfully');
+      setEditEventModalOpen(false);
+      refetchEvent();
+    } catch (err) {
+      console.error('Failed to update event:', err);
+      message.error('Failed to update event');
+      throw err;
+    }
+  };
+
   // Add conditional returns AFTER all hooks
   if (loading) {
     return (
@@ -609,7 +625,14 @@ export const EventDetailPage: React.FC = () => {
       </Button>
 
       <Card>
-        <Title level={2}>{event.name}</Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>{event.name}</Title>
+          {isAdmin && (
+            <Button icon={<EditOutlined />} onClick={() => setEditEventModalOpen(true)}>
+              Edit Event
+            </Button>
+          )}
+        </div>
         <Descriptions bordered column={2}>
           <Descriptions.Item label="Description" span={2}>
             {event.description}
@@ -784,8 +807,18 @@ export const EventDetailPage: React.FC = () => {
         allVolunteers={volunteers.filter((v: Volunteer) => !v.isDisabled)}
         assignedVolunteerIds={event.statuses?.map(s => s.volunteerID) || []}
         departments={departments}
+        assignedDepartmentIds={event.assignedGroups || []}
         onCancel={() => setAddVolunteerModalOpen(false)}
         onSubmit={handleAddVolunteersToAttendance}
+      />
+
+      {/* Edit Event Modal */}
+      <EventFormModal
+        open={editEventModalOpen}
+        event={event}
+        departments={departments}
+        onCancel={() => setEditEventModalOpen(false)}
+        onSubmit={handleEditEvent}
       />
     </div>
   );

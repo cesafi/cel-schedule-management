@@ -171,28 +171,28 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
         );
       },
     },
-    {
-      title: 'Status',
-      dataIndex: 'isDisabled',
-      key: 'isDisabled',
-      width: 120,
-      responsive: ['sm'],
-      render: (isDisabled: boolean, record: EventSchedule) => {
-        const total = (record.scheduledVolunteers?.length || 0) + (record.voluntaryVolunteers?.length || 0);
-        const needsHelp = total < 3;
-
-        return (
-          <Space direction="vertical" size="small">
-            <Tag color={isDisabled ? 'red' : 'green'}>
-              {isDisabled ? 'Cancelled' : 'Active'}
-            </Tag>
-            {!isDisabled && needsHelp && (
-              <Tag color="orange">Needs Help</Tag>
-            )}
-          </Space>
-        );
-      },
-    },
+    // Status column - temporarily disabled
+    // {
+    //   title: 'Status',
+    //   dataIndex: 'isDisabled',
+    //   key: 'isDisabled',
+    //   width: 120,
+    //   responsive: ['sm'],
+    //   render: (isDisabled: boolean, record: EventSchedule) => {
+    //     const total = (record.scheduledVolunteers?.length || 0) + (record.voluntaryVolunteers?.length || 0);
+    //     const needsHelp = total < 3;
+    //     return (
+    //       <Space direction="vertical" size="small">
+    //         <Tag color={isDisabled ? 'red' : 'green'}>
+    //           {isDisabled ? 'Cancelled' : 'Active'}
+    //         </Tag>
+    //         {!isDisabled && needsHelp && (
+    //           <Tag color="orange">Needs Help</Tag>
+    //         )}
+    //       </Space>
+    //     );
+    //   },
+    // },
     {
       title: 'Actions',
       key: 'actions',

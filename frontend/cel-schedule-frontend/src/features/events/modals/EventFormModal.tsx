@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, Form, Input, DatePicker, Select, Button, Space } from 'antd';
+import dayjs from 'dayjs';
 import { EventSchedule, EventCreateDTO, Department, EventLocation } from '../../../types';
 import { LocationInput } from '../../../components/LocationInput';
 
@@ -28,7 +29,7 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
         form.setFieldsValue({
           name: event.name,
           description: event.description,
-          timeAndDate: new Date(event.timeAndDate),
+          timeAndDate: dayjs(event.timeAndDate),
           location: event.location,
           assignedGroups: event.assignedGroups,
         });
@@ -38,7 +39,7 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
     }
   }, [open, event, form]);
 
-  const handleFinish = async (values: { name: string; description: string; timeAndDate: Date; location?: EventLocation; assignedGroups?: string[] }) => {
+  const handleFinish = async (values: { name: string; description: string; timeAndDate: dayjs.Dayjs; location?: EventLocation; assignedGroups?: string[] }) => {
     const data: EventCreateDTO = {
       name: values.name,
       description: values.description,

@@ -12,6 +12,7 @@ interface AddVolunteerToEventModalProps {
   allVolunteers: Volunteer[];
   assignedVolunteerIds: string[];
   departments: Department[];
+  assignedDepartmentIds?: string[];
   onCancel: () => void;
   onSubmit: (volunteerIds: string[]) => Promise<void>;
 }
@@ -28,6 +29,7 @@ export const AddVolunteerToEventModal: React.FC<AddVolunteerToEventModalProps> =
   allVolunteers,
   assignedVolunteerIds,
   departments,
+  assignedDepartmentIds = [],
   onCancel,
   onSubmit,
 }) => {
@@ -54,12 +56,17 @@ export const AddVolunteerToEventModal: React.FC<AddVolunteerToEventModalProps> =
     }));
   }, [allVolunteers, departments, assignedVolunteerIds]);
 
-  // Departments that actually have volunteers in allRows
+  // Departments that actually have volunteers in allRows,
+  // sorted: assigned depts first, then the rest
   const activeDepts = useMemo(() => {
-    return departments.filter(d =>
+    const depts = departments.filter(d =>
       allRows.some(r => r.depts.some(rd => rd.id === d.id))
     );
-  }, [departments, allRows]);
+    return [
+      ...depts.filter(d => assignedDepartmentIds.includes(d.id)),
+      ...depts.filter(d => !assignedDepartmentIds.includes(d.id)),
+    ];
+  }, [departments, allRows, assignedDepartmentIds]);
 
   // Filter rows by active tab and search term
   const visibleRows = useMemo(() => {
@@ -117,19 +124,35 @@ export const AddVolunteerToEventModal: React.FC<AddVolunteerToEventModalProps> =
         </Space>
       ),
     },
-    ...activeDepts.map(d => ({
-      key: d.id,
-      label: (
-        <Space size={4}>
-          {d.departmentName}
-          <Badge
-            count={allRows.filter(r => !r.isAssigned && r.depts.some(rd => rd.id === d.id)).length}
-            color="blue"
-            size="small"
-          />
-        </Space>
-      ),
-    })),
+    ...activeDepts.map(d => {
+      const isAssignedDept = assignedDepartmentIds.includes(d.id);
+      return {
+        key: d.id,
+        label: (
+          <Space
+            size={4}
+            style={isAssignedDept ? {
+              background: '#e6f4ff',
+              borderRadius: 6,
+              padding: '2px 6px',
+              fontWeight: 600,
+            } : undefined}
+          >
+            {d.departmentName}
+            {isAssignedDept && (
+              <Tag color="blue" style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px', marginInlineEnd: 0 }}>
+                assigned
+              </Tag>
+            )}
+            <Badge
+              count={allRows.filter(r => !r.isAssigned && r.depts.some(rd => rd.id === d.id)).length}
+              color="blue"
+              size="small"
+            />
+          </Space>
+        ),
+      };
+    }),
     {
       key: TAB_NO_DEPT,
       label: (
