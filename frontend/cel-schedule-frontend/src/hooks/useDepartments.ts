@@ -10,13 +10,15 @@ export const departmentKeys = {
 
 // Hook to fetch all departments
 // Pass includeDisabled=true (admin only) to also retrieve soft-deleted departments
-export const useDepartments = (includeDisabled = false) => {
+// Pass enabled=false to skip the query (e.g. when the user is not authenticated)
+export const useDepartments = (includeDisabled = false, enabled = true) => {
   const query = useQuery({
     queryKey: [...departmentKeys.all, { includeDisabled }],
     queryFn: () =>
       includeDisabled
         ? departmentsApi.getAllIncludingDisabled()
         : departmentsApi.getAll(),
+    enabled,
   });
 
   return query;

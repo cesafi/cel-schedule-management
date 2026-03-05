@@ -16,9 +16,10 @@ export const DepartmentsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const fetchDepartments = async () => {
+    if (!isAuthenticated) return;
     setLoading(true);
     try {
       const data = isAdmin
@@ -34,6 +35,7 @@ export const DepartmentsPage: React.FC = () => {
   };
 
   const fetchVolunteers = async () => {
+    if (!isAuthenticated) return;
     try {
       const data = await volunteersApi.getAll();
       setVolunteers(data.filter(v => !v.isDisabled));
@@ -44,10 +46,11 @@ export const DepartmentsPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     fetchDepartments();
     fetchVolunteers();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [authLoading, isAuthenticated, isAdmin]);
 
   const handleCreate = () => {
     setModalOpen(true);
