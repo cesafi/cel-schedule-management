@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col, Space } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined, RollbackOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined, RollbackOutlined, EditOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
-import { Department, Volunteer, MembershipType, AddMemberDTO, EventSchedule } from '../../types';
+import { Department, Volunteer, MembershipType, AddMemberDTO, DepartmentUpdateDTO, EventSchedule } from '../../types';
 import { format } from 'date-fns';
 import { AddMemberModal } from './modals/AddMemberModal';
+import { DepartmentEditModal } from './modals/DepartmentEditModal';
 import { useAuth } from '../auth';
 import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
 import { useDepartmentAnalytics, useUpcomingEvents, useEntityLogs } from '../../hooks';
@@ -21,6 +22,7 @@ export const DepartmentDetailPage: React.FC = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -145,6 +147,20 @@ export const DepartmentDetailPage: React.FC = () => {
       message.error('Failed to restore department');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleEditSubmit = async (values: DepartmentUpdateDTO) => {
+    if (!id) return;
+    try {
+      await departmentsApi.update(id, values);
+      message.success('Department updated successfully');
+      setEditModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error('Failed to update department:', err);
+      message.error('Failed to update department');
+      throw err;
     }
   };
 
@@ -516,6 +532,9 @@ export const DepartmentDetailPage: React.FC = () => {
           <Title level={2} style={{ margin: 0 }}>{department.departmentName}</Title>
           {isAdmin && (
             <Space wrap>
+              <Button icon={<EditOutlined />} onClick={() => setEditModalOpen(true)}>
+                Edit Department
+              </Button>
               {department.isDisabled && (
                 <Popconfirm
                   title="Restore Department"
@@ -584,6 +603,13 @@ export const DepartmentDetailPage: React.FC = () => {
         availableVolunteers={availableVolunteers}
         onCancel={() => setModalOpen(false)}
         onSubmit={handleAddMember}
+      />
+
+      <DepartmentEditModal
+        open={editModalOpen}
+        department={department}
+        onCancel={() => setEditModalOpen(false)}
+        onSubmit={handleEditSubmit}
       />
     </div>
   );

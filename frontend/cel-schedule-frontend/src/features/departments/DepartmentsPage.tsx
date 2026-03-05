@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Table, Button, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { departmentsApi, volunteersApi } from '../../api';
-import { Department, DepartmentCreateDTO, Volunteer } from '../../types';
+import { Department, DepartmentCreateDTO, DepartmentUpdateDTO, Volunteer } from '../../types';
 import { useAuth } from '../auth';
 import { format } from 'date-fns';
 import { DepartmentFormModal } from './modals/DepartmentFormModal';
+import { DepartmentEditModal } from './modals/DepartmentEditModal';
 
 const { Title } = Typography;
 
@@ -15,6 +16,7 @@ export const DepartmentsPage: React.FC = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const navigate = useNavigate();
   const { isAdmin, isAuthenticated, isLoading: authLoading } = useAuth();
 
@@ -76,6 +78,24 @@ export const DepartmentsPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to create department:', err);
       message.error('Failed to create department');
+      throw err;
+    }
+  };
+
+  const handleEdit = (department: Department) => {
+    setEditingDepartment(department);
+  };
+
+  const handleEditSubmit = async (values: DepartmentUpdateDTO) => {
+    if (!editingDepartment) return;
+    try {
+      await departmentsApi.update(editingDepartment.id, values);
+      message.success('Department updated successfully');
+      setEditingDepartment(null);
+      fetchDepartments();
+    } catch (err) {
+      console.error('Failed to update department:', err);
+      message.error('Failed to update department');
       throw err;
     }
   };
@@ -144,6 +164,15 @@ export const DepartmentsPage: React.FC = () => {
             View
           </Button>
           {isAdmin && !record.isDisabled && (
+            <Button
+              type="link"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            >
+              Edit
+            </Button>
+          )}
+          {isAdmin && !record.isDisabled && (
             <Popconfirm
               title="Delete department"
               description="Are you sure you want to delete this department?"
@@ -201,6 +230,13 @@ export const DepartmentsPage: React.FC = () => {
         volunteers={volunteers}
         onCancel={() => setModalOpen(false)}
         onSubmit={handleSubmit}
+      />
+
+      <DepartmentEditModal
+        open={!!editingDepartment}
+        department={editingDepartment}
+        onCancel={() => setEditingDepartment(null)}
+        onSubmit={handleEditSubmit}
       />
     </div>
   );
