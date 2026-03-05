@@ -172,6 +172,18 @@ export const firestoreService = {
       const docRef = doc(db, COLLECTIONS.volunteers, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
     },
+
+    /** Restore — sets IsDisabled = false */
+    async restore(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.volunteers, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+    },
+
+    /** Hard delete — permanently removes the document from Firestore */
+    async hardDelete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.volunteers, id);
+      await deleteDoc(docRef);
+    },
   },
 
   // ==========================================================================
@@ -247,6 +259,18 @@ export const firestoreService = {
     async delete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.departments, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+    },
+
+    /** Restore — sets IsDisabled = false */
+    async restore(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.departments, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+    },
+
+    /** Hard delete — permanently removes the document from Firestore */
+    async hardDelete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.departments, id);
+      await deleteDoc(docRef);
     },
 
     async addMember(deptId: string, data: AddMemberDTO): Promise<Department> {
@@ -388,6 +412,18 @@ export const firestoreService = {
     async delete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.events, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+    },
+
+    /** Restore — sets IsDisabled = false */
+    async restore(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.events, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+    },
+
+    /** Hard delete — permanently removes the document from Firestore */
+    async hardDelete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.events, id);
+      await deleteDoc(docRef);
     },
 
     async addStatus(eventId: string, data: AddStatusDTO): Promise<EventSchedule> {

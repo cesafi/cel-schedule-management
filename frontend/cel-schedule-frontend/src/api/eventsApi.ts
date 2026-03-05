@@ -35,6 +35,16 @@ export const eventsApi = {
     return firestoreService.events.delete(id);
   },
 
+  /** Restore — sets IsDisabled = false in Firestore */
+  async restore(id: string): Promise<void> {
+    return firestoreService.events.restore(id);
+  },
+
+  /** Hard delete — permanently removes the document from Firestore */
+  async hardDelete(id: string): Promise<void> {
+    return firestoreService.events.hardDelete(id);
+  },
+
   async addStatus(id: string, data: AddStatusDTO): Promise<EventSchedule> {
     return firestoreService.events.addStatus(id, data);
   },

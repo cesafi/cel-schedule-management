@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col, Space } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined, RollbackOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
 import { Department, Volunteer, MembershipType, AddMemberDTO, EventSchedule } from '../../types';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ export const DepartmentDetailPage: React.FC = () => {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [logPage, setLogPage] = useState(1);
@@ -129,6 +130,35 @@ export const DepartmentDetailPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to remove member:', err);
       message.error('Failed to remove member');
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await departmentsApi.restore(id);
+      message.success('Department restored successfully');
+      fetchData();
+    } catch (err) {
+      console.error('Failed to restore department:', err);
+      message.error('Failed to restore department');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await departmentsApi.hardDelete(id);
+      message.success('Department permanently deleted');
+      navigate('/departments');
+    } catch (err) {
+      console.error('Failed to permanently delete department:', err);
+      message.error('Failed to permanently delete department');
+      setActionLoading(false);
     }
   };
 
@@ -482,7 +512,39 @@ export const DepartmentDetailPage: React.FC = () => {
       </Button>
 
       <Card>
-        <Title level={2}>{department.departmentName}</Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>{department.departmentName}</Title>
+          {isAdmin && (
+            <Space wrap>
+              {department.isDisabled && (
+                <Popconfirm
+                  title="Restore Department"
+                  description="Are you sure you want to restore this department? It will become active again."
+                  onConfirm={handleRestore}
+                  okText="Restore"
+                  cancelText="Cancel"
+                  okButtonProps={{ loading: actionLoading }}
+                >
+                  <Button icon={<RollbackOutlined />} type="primary">
+                    Restore
+                  </Button>
+                </Popconfirm>
+              )}
+              <Popconfirm
+                title="Permanently Delete Department"
+                description="This action cannot be undone. The department and all its data will be permanently removed."
+                onConfirm={handleHardDelete}
+                okText="Delete Permanently"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: actionLoading }}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={actionLoading}>
+                  Hard Delete
+                </Button>
+              </Popconfirm>
+            </Space>
+          )}
+        </div>
         <Descriptions bordered column={2}>
           <Descriptions.Item label="ID">{department.id}</Descriptions.Item>
           <Descriptions.Item label="Department Head">

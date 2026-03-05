@@ -34,6 +34,16 @@ export const volunteersApi = {
     return firestoreService.volunteers.delete(id);
   },
 
+  /** Restore — sets IsDisabled = false in Firestore */
+  async restore(id: string): Promise<void> {
+    return firestoreService.volunteers.restore(id);
+  },
+
+  /** Hard delete — permanently removes the document from Firestore */
+  async hardDelete(id: string): Promise<void> {
+    return firestoreService.volunteers.hardDelete(id);
+  },
+
   /**
    * Audit logs for a volunteer are written by the Cloud Function onWrite trigger.
    * This queries the logs collection filtered by volunteerId in metadata.

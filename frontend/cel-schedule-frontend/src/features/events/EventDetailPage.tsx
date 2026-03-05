@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined, EditOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined, EditOutlined, RollbackOutlined } from '@ant-design/icons';
 import { eventsApi } from '../../api';
 import { Volunteer, Department, AddStatusDTO, EventCreateDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
@@ -36,6 +36,7 @@ export const EventDetailPage: React.FC = () => {
   const logPageSize = 20;
   const [filterTimeIn, setFilterTimeIn] = useState<string | null>(null);
   const [filterTimeOut, setFilterTimeOut] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Fetch data using React Query hooks
   const { data: event, isLoading: eventLoading } = useEvent(id);
@@ -66,6 +67,35 @@ export const EventDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: eventKeys.all });
     }
   }, [id, queryClient]);
+
+  const handleRestore = useCallback(async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await eventsApi.restore(id);
+      message.success('Event restored successfully');
+      refetchEvent();
+    } catch (err) {
+      console.error('Failed to restore event:', err);
+      message.error('Failed to restore event');
+    } finally {
+      setActionLoading(false);
+    }
+  }, [id, refetchEvent]);
+
+  const handleHardDelete = useCallback(async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await eventsApi.hardDelete(id);
+      message.success('Event permanently deleted');
+      navigate('/schedules');
+    } catch (err) {
+      console.error('Failed to permanently delete event:', err);
+      message.error('Failed to permanently delete event');
+      setActionLoading(false);
+    }
+  }, [id, navigate]);
 
   const handleTimeIn = useCallback(async (volunteerId: string, values: { timeIn?: string; attendanceType: AttendanceType }) => {
     if (!id) return;
@@ -628,9 +658,37 @@ export const EventDetailPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
           <Title level={2} style={{ margin: 0 }}>{event.name}</Title>
           {isAdmin && (
-            <Button icon={<EditOutlined />} onClick={() => setEditEventModalOpen(true)}>
-              Edit Event
-            </Button>
+            <Space wrap>
+              <Button icon={<EditOutlined />} onClick={() => setEditEventModalOpen(true)}>
+                Edit Event
+              </Button>
+              {event.isDisabled && (
+                <Popconfirm
+                  title="Restore Event"
+                  description="Are you sure you want to restore this event? It will become active again."
+                  onConfirm={handleRestore}
+                  okText="Restore"
+                  cancelText="Cancel"
+                  okButtonProps={{ loading: actionLoading }}
+                >
+                  <Button icon={<RollbackOutlined />} type="primary">
+                    Restore
+                  </Button>
+                </Popconfirm>
+              )}
+              <Popconfirm
+                title="Permanently Delete Event"
+                description="This action cannot be undone. The event and all its data will be permanently removed."
+                onConfirm={handleHardDelete}
+                okText="Delete Permanently"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: actionLoading }}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={actionLoading}>
+                  Hard Delete
+                </Button>
+              </Popconfirm>
+            </Space>
           )}
         </div>
         <Descriptions bordered column={2}>

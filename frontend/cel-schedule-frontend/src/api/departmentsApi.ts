@@ -39,6 +39,16 @@ export const departmentsApi = {
     return firestoreService.departments.delete(id);
   },
 
+  /** Restore — sets IsDisabled = false in Firestore */
+  async restore(id: string): Promise<void> {
+    return firestoreService.departments.restore(id);
+  },
+
+  /** Hard delete — permanently removes the document from Firestore */
+  async hardDelete(id: string): Promise<void> {
+    return firestoreService.departments.hardDelete(id);
+  },
+
   async addMember(id: string, data: AddMemberDTO): Promise<Department> {
     return firestoreService.departments.addMember(id, data);
   },
