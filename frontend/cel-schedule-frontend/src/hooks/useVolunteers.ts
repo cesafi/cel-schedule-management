@@ -9,22 +9,19 @@ export const volunteerKeys = {
 };
 
 // Hook to fetch all volunteers
-export const useVolunteers = (includeDisabled = false) => {
+// Pass includeDisabled=true (admin only) to also retrieve soft-deleted volunteers
+// Pass enabled=false to skip the query (e.g. when the user is not authenticated)
+export const useVolunteers = (includeDisabled = false, enabled = true) => {
   const query = useQuery({
-    queryKey: volunteerKeys.all,
-    queryFn: () => volunteersApi.getAll(),
+    queryKey: [...volunteerKeys.all, { includeDisabled }],
+    queryFn: () =>
+      includeDisabled
+        ? volunteersApi.getAllIncludingDisabled()
+        : volunteersApi.getAll(),
+    enabled,
   });
 
-  // Filter disabled volunteers if needed
-  const filteredData = useMemo(() => {
-    if (includeDisabled || !query.data) return query.data;
-    return query.data.filter(v => !v.isDisabled);
-  }, [query.data, includeDisabled]);
-
-  return {
-    ...query,
-    data: filteredData,
-  };
+  return query;
 };
 
 // Hook to get volunteer Map for O(1) lookups

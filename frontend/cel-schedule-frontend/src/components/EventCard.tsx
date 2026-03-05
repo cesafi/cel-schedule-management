@@ -18,6 +18,7 @@ interface EventCardProps {
   showCheckInButton?: boolean;
   onCheckIn?: (eventId: string) => void;
   index?: number;
+  isAdmin?: boolean;
 }
 
 export const EventCard: React.FC<EventCardProps> = ({ 
@@ -25,11 +26,13 @@ export const EventCard: React.FC<EventCardProps> = ({
   showCheckInButton = false,
   onCheckIn,
   index = 0,
+  isAdmin = false,
 }) => {
   const navigate = useNavigate();
   const eventDate = new Date(event.timeAndDate);
   const isPastEvent = isPast(eventDate) && !isToday(eventDate);
   const isTodayEvent = isToday(eventDate);
+  const isDeletedEvent = isAdmin && event.isDisabled;
   
   const totalVolunteers = 
     (event.scheduledVolunteers?.length || 0) + (event.voluntaryVolunteers?.length || 0);
@@ -46,12 +49,14 @@ export const EventCard: React.FC<EventCardProps> = ({
   };
 
   const getBorderColor = () => {
+    if (isDeletedEvent) return 'rgba(255, 77, 79, 0.3)';
     if (isPastEvent) return 'rgba(64, 64, 64, 0.6)';
     if (isTodayEvent) return 'rgba(5, 107, 47, 0.12)';
     return 'rgba(64, 64, 64, 0.8)';
   };
 
   const getLeftBorderColor = () => {
+    if (isDeletedEvent) return '#ff4d4f';
     if (isPastEvent) return '#525252';
     if (isTodayEvent) return '#a3a3a3';
     return '#737373';
@@ -63,7 +68,7 @@ export const EventCard: React.FC<EventCardProps> = ({
     <>
       <style>{`
         .${cardClassName} {
-          background: rgba(23, 23, 23, 0.6);
+          background: ${isDeletedEvent ? 'rgba(40, 10, 10, 0.6)' : 'rgba(23, 23, 23, 0.6)'};
           border-top: 1px solid ${getBorderColor()};
           border-right: 1px solid ${getBorderColor()};
           border-bottom: 1px solid ${getBorderColor()};
@@ -72,7 +77,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           padding: 20px;
           cursor: pointer;
           backdrop-filter: blur(8px);
-          opacity: ${isPastEvent ? 0.7 : 1};
+          opacity: ${isDeletedEvent ? 0.65 : isPastEvent ? 0.7 : 1};
           transform: translate3d(0, 0, 0);
           will-change: box-shadow, transform;
           transition: box-shadow 0.3s ease, transform 0.3s ease;
@@ -101,14 +106,32 @@ export const EventCard: React.FC<EventCardProps> = ({
             level={5} 
             style={{ 
               margin: 0,
-              color: '#ffffff',
+              color: isDeletedEvent ? '#a3a3a3' : '#ffffff',
               fontSize: '18px',
               fontWeight: '400',
+              textDecoration: isDeletedEvent ? 'line-through' : undefined,
             }}
           >
             {event.name}
           </Title>
           <div style={{ display: 'flex', gap: '8px' }}>
+            {isDeletedEvent && (
+              <Tag
+                style={{
+                  background: 'rgba(255, 77, 79, 0.15)',
+                  border: '1px solid rgba(255, 77, 79, 0.5)',
+                  color: '#ff4d4f',
+                  fontSize: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  fontWeight: '600',
+                  borderRadius: '6px',
+                  margin: 0,
+                }}
+              >
+                Deleted
+              </Tag>
+            )}
             {isTodayEvent && (
               <Tag 
                 style={{ 

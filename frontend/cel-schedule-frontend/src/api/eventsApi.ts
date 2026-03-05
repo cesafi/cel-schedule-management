@@ -14,6 +14,11 @@ export const eventsApi = {
     return firestoreService.events.getAll();
   },
 
+  /** Fetch all events including soft-deleted ones — for admin use only */
+  async getAllIncludingDisabled(): Promise<EventSchedule[]> {
+    return firestoreService.events.getAllIncludingDisabled();
+  },
+
   async getById(id: string): Promise<EventSchedule> {
     return firestoreService.events.getById(id);
   },

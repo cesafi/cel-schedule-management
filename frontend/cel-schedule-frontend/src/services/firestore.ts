@@ -133,6 +133,16 @@ export const firestoreService = {
       return volunteers.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
     },
 
+    /** Fetch all volunteers including soft-deleted ones (admin only) */
+    async getAllIncludingDisabled(): Promise<Volunteer[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.volunteers));
+      const volunteers = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<Volunteer, 'id'>),
+      })) as Volunteer[];
+      return volunteers.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    },
+
     async getById(id: string): Promise<Volunteer> {
       const docRef = doc(db, COLLECTIONS.volunteers, id);
       const snap = await getDoc(docRef);
@@ -174,6 +184,18 @@ export const firestoreService = {
         where('IsDisabled', '==', false),
       );
       const snapshot = await getDocs(q);
+      const departments = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<Department, 'id'>),
+      })) as Department[];
+      return departments.sort((a, b) =>
+        (a.departmentName ?? '').localeCompare(b.departmentName ?? ''),
+      );
+    },
+
+    /** Fetch all departments including soft-deleted ones (admin only) */
+    async getAllIncludingDisabled(): Promise<Department[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.departments));
       const departments = snapshot.docs.map((d) => ({
         id: d.id,
         ...(convertFirestoreData(d.data()) as Omit<Department, 'id'>),
@@ -300,6 +322,19 @@ export const firestoreService = {
         where('IsDisabled', '==', false),
       );
       const snapshot = await getDocs(q);
+      const events = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<EventSchedule, 'id'>),
+      })) as EventSchedule[];
+      return events.sort(
+        (a, b) =>
+          new Date(b.timeAndDate ?? 0).getTime() - new Date(a.timeAndDate ?? 0).getTime(),
+      );
+    },
+
+    /** Fetch all events including soft-deleted ones (admin only) */
+    async getAllIncludingDisabled(): Promise<EventSchedule[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.events));
       const events = snapshot.docs.map((d) => ({
         id: d.id,
         ...(convertFirestoreData(d.data()) as Omit<EventSchedule, 'id'>),

@@ -13,6 +13,12 @@ export const departmentsApi = {
     return firestoreService.departments.getAll();
   },
 
+  /** Fetch all departments including soft-deleted ones — for admin use only */
+  async getAllIncludingDisabled(): Promise<Department[]> {
+    return firestoreService.departments.getAllIncludingDisabled();
+  },
+
+
   async getById(id: string): Promise<Department> {
     return firestoreService.departments.getById(id);
   },

@@ -47,8 +47,8 @@ export const HomePage: React.FC = () => {
 
   // Fetch data using React Query hooks
   const { data: allEvents = [], isLoading: eventsLoading } = useEvents();
-  const { data: volunteers = [], isLoading: volunteersLoading } = useVolunteers(true);
-  const { data: departments = [], isLoading: departmentsLoading } = useDepartments(true);
+  const { data: volunteers = [], isLoading: volunteersLoading } = useVolunteers(isAdmin, isAuthenticated);
+  const { data: departments = [], isLoading: departmentsLoading } = useDepartments(isAdmin, isAuthenticated);
 
   const loading = eventsLoading || volunteersLoading || departmentsLoading;
 
@@ -274,7 +274,7 @@ export const HomePage: React.FC = () => {
       {/* Today's Events Section */}
       {todaysEvents.length > 0 && (
         <Card 
-          style={{ marginTop: 24, backgroundColor: '#f6ffed', borderColor: '#52c41a' }} 
+          style={{ marginTop: 24, backgroundColor: 'rgba(82, 196, 26, 0.08)', borderColor: 'rgba(82, 196, 26, 0.4)' }} 
           title={
             <Space>
               <ClockCircleOutlined style={{ color: '#52c41a' }} />

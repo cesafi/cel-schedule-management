@@ -56,8 +56,13 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
         const today = isToday(new Date(record.timeAndDate));
         return (
           <Space direction="vertical" size="small">
-            <span style={{ fontWeight: 500 }}>{name}</span>
-            {today && <Tag color="green">Today</Tag>}
+            <span style={{
+              fontWeight: 500,
+              textDecoration: record.isDisabled ? 'line-through' : undefined,
+              color: record.isDisabled ? '#999' : undefined,
+            }}>{name}</span>
+            {today && !record.isDisabled && <Tag color="green">Today</Tag>}
+            {isAdmin && record.isDisabled && <Tag color="red">Deleted</Tag>}
           </Space>
         );
       },
@@ -238,6 +243,8 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
 
   // Add row className for styling
   const rowClassName = useCallback((record: EventSchedule) => {
+    // Disabled rows always get their own class regardless of date
+    if (record.isDisabled) return 'event-row-disabled';
     const eventDate = new Date(record.timeAndDate);
     if (isToday(eventDate)) return 'event-row-today';
     if (isPast(eventDate)) return 'event-row-past';
@@ -251,7 +258,7 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
           border-left: 4px solid #52c41a;
         }
         .event-row-today > td {
-          background-color: #f6ffed !important;
+          background-color: rgba(82, 196, 26, 0.08) !important;
         }
         .event-row-past {
           opacity: 0.6;
@@ -260,9 +267,17 @@ export const EventsTableView: React.FC<EventsTableViewProps> = React.memo(({
         .event-row-upcoming {
           border-left: 4px solid #1890ff;
         }
+        .event-row-disabled > td {
+          background-color: rgba(255, 77, 79, 0.07) !important;
+          opacity: 0.65;
+        }
+        .event-row-disabled {
+          border-left: 4px solid #ff4d4f;
+        }
         .event-row-today:hover > td,
         .event-row-past:hover > td,
-        .event-row-upcoming:hover > td {
+        .event-row-upcoming:hover > td,
+        .event-row-disabled:hover > td {
           background-color: #1a1a1a !important;
         }
         

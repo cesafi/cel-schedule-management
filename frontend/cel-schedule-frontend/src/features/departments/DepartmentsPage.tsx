@@ -21,7 +21,9 @@ export const DepartmentsPage: React.FC = () => {
   const fetchDepartments = async () => {
     setLoading(true);
     try {
-      const data = await departmentsApi.getAll();
+      const data = isAdmin
+        ? await departmentsApi.getAllIncludingDisabled()
+        : await departmentsApi.getAll();
       setDepartments(data);
     } catch (err) {
       console.error('Failed to load departments:', err);
@@ -44,7 +46,8 @@ export const DepartmentsPage: React.FC = () => {
   useEffect(() => {
     fetchDepartments();
     fetchVolunteers();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
 
   const handleCreate = () => {
     setModalOpen(true);
@@ -80,6 +83,15 @@ export const DepartmentsPage: React.FC = () => {
       dataIndex: 'departmentName',
       key: 'departmentName',
       sorter: (a: Department, b: Department) => a.departmentName.localeCompare(b.departmentName),
+      render: (name: string, record: Department) => (
+        <Space size="small">
+          <span style={{
+            textDecoration: record.isDisabled ? 'line-through' : undefined,
+            color: record.isDisabled ? '#999' : undefined,
+          }}>{name}</span>
+          {isAdmin && record.isDisabled && <Tag color="red">Deleted</Tag>}
+        </Space>
+      ),
     },
     {
       title: 'Members',
@@ -102,7 +114,7 @@ export const DepartmentsPage: React.FC = () => {
       key: 'isDisabled',
       render: (isDisabled: boolean) => (
         <Tag color={isDisabled ? 'red' : 'green'}>
-          {isDisabled ? 'Inactive' : 'Active'}
+          {isDisabled ? 'Deleted' : 'Active'}
         </Tag>
       ),
     },
@@ -110,7 +122,11 @@ export const DepartmentsPage: React.FC = () => {
       title: 'Created',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date: string) => format(new Date(date), 'MMM dd, yyyy'),
+      render: (date: string) => {
+        if (!date) return '-';
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? '-' : format(d, 'MMM dd, yyyy');
+      },
     },
     {
       title: 'Actions',
@@ -124,7 +140,7 @@ export const DepartmentsPage: React.FC = () => {
           >
             View
           </Button>
-          {isAdmin && (
+          {isAdmin && !record.isDisabled && (
             <Popconfirm
               title="Delete department"
               description="Are you sure you want to delete this department?"
@@ -142,8 +158,23 @@ export const DepartmentsPage: React.FC = () => {
     },
   ];
 
+  const rowClassName = (record: Department) =>
+    record.isDisabled ? 'department-row-deleted' : '';
+
   return (
     <div>
+      <style>{`
+        .department-row-deleted > td {
+          background-color: rgba(255, 77, 79, 0.07) !important;
+          opacity: 0.65;
+        }
+        .department-row-deleted {
+          border-left: 4px solid #ff4d4f;
+        }
+        .department-row-deleted:hover > td {
+          background-color: rgba(255, 77, 79, 0.12) !important;
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={2}>Departments</Title>
         {isAdmin && (
@@ -159,6 +190,7 @@ export const DepartmentsPage: React.FC = () => {
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
+        rowClassName={rowClassName}
       />
 
       <DepartmentFormModal
@@ -170,3 +202,4 @@ export const DepartmentsPage: React.FC = () => {
     </div>
   );
 };
+

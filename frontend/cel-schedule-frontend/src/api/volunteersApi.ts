@@ -7,6 +7,12 @@ export const volunteersApi = {
     return firestoreService.volunteers.getAll();
   },
 
+  /** Fetch all volunteers including soft-deleted ones — for admin use only */
+  async getAllIncludingDisabled(): Promise<Volunteer[]> {
+    return firestoreService.volunteers.getAllIncludingDisabled();
+  },
+
+
   async getById(id: string): Promise<Volunteer> {
     return firestoreService.volunteers.getById(id);
   },

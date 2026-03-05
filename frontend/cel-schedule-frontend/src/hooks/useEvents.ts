@@ -10,10 +10,14 @@ export const eventKeys = {
 };
 
 // Hook to fetch all events
-export const useEvents = () => {
+// Pass includeDisabled=true (admin only) to also retrieve soft-deleted events
+export const useEvents = (includeDisabled = false) => {
   return useQuery({
-    queryKey: eventKeys.all,
-    queryFn: () => eventsApi.getAll(),
+    queryKey: [...eventKeys.all, { includeDisabled }],
+    queryFn: () =>
+      includeDisabled
+        ? eventsApi.getAllIncludingDisabled()
+        : eventsApi.getAll(),
   });
 };
 

@@ -9,22 +9,17 @@ export const departmentKeys = {
 };
 
 // Hook to fetch all departments
+// Pass includeDisabled=true (admin only) to also retrieve soft-deleted departments
 export const useDepartments = (includeDisabled = false) => {
   const query = useQuery({
-    queryKey: departmentKeys.all,
-    queryFn: () => departmentsApi.getAll(),
+    queryKey: [...departmentKeys.all, { includeDisabled }],
+    queryFn: () =>
+      includeDisabled
+        ? departmentsApi.getAllIncludingDisabled()
+        : departmentsApi.getAll(),
   });
 
-  // Filter disabled departments if needed
-  const filteredData = useMemo(() => {
-    if (includeDisabled || !query.data) return query.data;
-    return query.data.filter(d => !d.isDisabled);
-  }, [query.data, includeDisabled]);
-
-  return {
-    ...query,
-    data: filteredData,
-  };
+  return query;
 };
 
 // Hook to get department Map for O(1) lookups

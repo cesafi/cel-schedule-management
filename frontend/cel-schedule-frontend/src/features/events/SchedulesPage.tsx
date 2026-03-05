@@ -24,7 +24,8 @@ export const SchedulesPage: React.FC = () => {
   const [viewMode, setViewMode] = useViewMode();
 
   // Fetch data using React Query hooks
-  const { data: events = [], isLoading: eventsLoading } = useEvents();
+  // Admins see all events including soft-deleted ones
+  const { data: events = [], isLoading: eventsLoading } = useEvents(isAdmin);
   const { data: departments = [], isLoading: deptsLoading } = useDepartments();
 
   // Mutations
@@ -175,7 +176,7 @@ export const SchedulesPage: React.FC = () => {
           )}
           
           {viewMode === 'cards' && (
-            <EventsCardView events={filteredEvents} />
+            <EventsCardView events={filteredEvents} isAdmin={isAdmin} />
           )}
           
           {viewMode === 'calendar' && (
