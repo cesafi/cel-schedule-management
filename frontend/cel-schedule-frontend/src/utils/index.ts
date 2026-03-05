@@ -6,5 +6,4 @@
 
 export * from './colorSchemes';
 export * from './analytics';
-export * from './storage';
 export * from './themeConfig';

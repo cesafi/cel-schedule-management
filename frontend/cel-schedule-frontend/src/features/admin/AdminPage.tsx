@@ -33,8 +33,9 @@ export const AdminPage: React.FC = () => {
     setLoading(true);
     try {
       const data: AuthUserCreateDTO = {
-        username: values.username,
+        email: values.email,
         password: values.password,
+        username: values.username,
         volunteerId: values.volunteerId,
         accessLevel: values.accessLevel,
       };
@@ -42,8 +43,8 @@ export const AdminPage: React.FC = () => {
       message.success('User created successfully');
       userForm.resetFields();
     } catch (err) {
-      const error = err as { response?: { data?: { error?: string } } };
-      message.error(error.response?.data?.error || 'Failed to create user');
+      const error = err as { message?: string };
+      message.error(error.message || 'Failed to create user');
     } finally {
       setLoading(false);
     }
@@ -108,17 +109,28 @@ export const AdminPage: React.FC = () => {
           <Card title="Create New User" style={{ maxWidth: 600 }}>
             <Form form={userForm} layout="vertical" onFinish={handleCreateUser}>
               <Form.Item
-                name="username"
-                label="Username"
-                rules={[{ required: true, message: 'Please enter username' }]}
+                name="email"
+                label="Email"
+                rules={[
+                  { required: true, message: 'Please enter email' },
+                  { type: 'email', message: 'Please enter a valid email' },
+                ]}
               >
-                <Input placeholder="Enter username" />
+                <Input placeholder="user@example.com" />
+              </Form.Item>
+
+              <Form.Item
+                name="username"
+                label="Display Name"
+                rules={[{ required: true, message: 'Please enter a display name' }]}
+              >
+                <Input placeholder="e.g. John Doe" />
               </Form.Item>
 
               <Form.Item
                 name="password"
                 label="Password"
-                rules={[{ required: true, message: 'Please enter password' }]}
+                rules={[{ required: true, message: 'Please enter password' }, { min: 8, message: 'Minimum 8 characters' }]}
               >
                 <Input.Password placeholder="Enter password" />
               </Form.Item>

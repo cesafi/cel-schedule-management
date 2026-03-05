@@ -10,10 +10,10 @@ export const useLogs = (params?: LogFilters) => {
   });
 };
 
-export const useArchivedLogs = (params?: { limit?: number; offset?: number }) => {
+export const useArchivedLogs = (_params?: { limit?: number; offset?: number }) => {
   return useQuery({
-    queryKey: ['logs', 'archived', params],
-    queryFn: () => logsApi.getArchivedLogs(params),
+    queryKey: ['logs', 'archived'],
+    queryFn: () => logsApi.getArchivedLogs(),
     staleTime: 60000, // 1 minute
   });
 };

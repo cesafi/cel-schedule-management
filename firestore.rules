@@ -1,0 +1,97 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -----------------------------------------------------------------------
+    // Helper Functions
+    // -----------------------------------------------------------------------
+
+    /// Returns true when the requester is authenticated.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /// Returns the caller's accessLevel custom claim (default 99 = no access).
+    function accessLevel() {
+      return request.auth.token.get('accessLevel', 99);
+    }
+
+    /// Returns true when the caller is a system admin (accessLevel == 1).
+    function isAdmin() {
+      return isSignedIn() && accessLevel() == 1;
+    }
+
+    /// Returns true when the caller is at least a dept head (accessLevel <= 2).
+    function isDeptHeadOrAbove() {
+      return isSignedIn() && accessLevel() <= 2;
+    }
+
+    /// Returns the volunteerId claim attached to the caller's token.
+    function callerVolunteerId() {
+      return request.auth.token.get('volunteerId', '');
+    }
+
+    // -----------------------------------------------------------------------
+    // volunteers
+    //   read  — any signed-in user
+    //   write — admin only (dept heads are read-only on the root doc;
+    //            event time-in/time-out writes go through Cloud Functions)
+    // -----------------------------------------------------------------------
+    match /volunteers/{volunteerId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (isDeptHeadOrAbove() && callerVolunteerId() == volunteerId);
+    }
+
+    // -----------------------------------------------------------------------
+    // departments
+    //   read  — any signed-in user
+    //   write — admin or dept head who is listed as head of this department
+    // -----------------------------------------------------------------------
+    match /departments/{departmentId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (isDeptHeadOrAbove()
+            && get(/databases/$(database)/documents/departments/$(departmentId)).data.HeadId == callerVolunteerId());
+    }
+
+    // -----------------------------------------------------------------------
+    // events
+    //   read  — any signed-in user
+    //   write — admin or dept head (dept heads can update event status/time for
+    //            any volunteer in their department; handled by security rules
+    //            here and enforced more granularly by Cloud Functions callables)
+    // -----------------------------------------------------------------------
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isDeptHeadOrAbove();
+    }
+
+    // -----------------------------------------------------------------------
+    // users  (auth user profiles)
+    //   read  — owner (own profile) OR admin
+    //   write — admin only (creation and updates done via Cloud Functions)
+    // -----------------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // -----------------------------------------------------------------------
+    // logs
+    //   read  — admin only
+    //   write — Cloud Functions only (no client writes allowed)
+    //           Enforcement: client writes are denied; only service accounts
+    //           (Cloud Functions) bypass these rules via admin SDK.
+    // -----------------------------------------------------------------------
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+  }
+}

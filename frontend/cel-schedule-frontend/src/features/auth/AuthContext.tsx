@@ -1,43 +1,47 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '../../config/firebase';
 import { AuthUser, LoginDTO, AccessLevel } from '../../types';
 import { Department, MembershipType } from '../../types';
-import { authApi } from '../../api/authApi';
+import { authApi, buildAuthUser } from '../../api/authApi';
 import { departmentsApi } from '../../api/departmentsApi';
-import { storage } from '../../utils/storage';
 
 interface AuthContextType {
   user: AuthUser | null;
+  firebaseUser: User | null;
   userDepartments: Department[];
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginDTO) => Promise<void>;
-  logout: () => void;
+  loginWithProvider: (providerId: 'google.com' | 'github.com' | 'microsoft.com') => Promise<void>;
+  logout: () => Promise<void>;
   hasRole: (role: AccessLevel) => boolean;
   isAdmin: boolean;
   isDeptHead: boolean;
   isHeadOfDepartment: (departmentId: string) => boolean;
   canManageVolunteer: (volunteerId: string) => boolean;
-  setUser: (user: AuthUser | null) => void;
-  setToken: (token: string) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [userDepartments, setUserDepartments] = useState<Department[]>([]);
+  // Start as loading — Firebase restores the session asynchronously on mount
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch user's departments when user changes
+  // ----- Fetch the authenticated user's departments whenever user changes -----
   useEffect(() => {
     const fetchUserDepartments = async () => {
       if (user?.volunteerId) {
         try {
           const allDepartments = await departmentsApi.getAll();
-          const myDepartments = allDepartments.filter(dept =>
+          const myDepartments = allDepartments.filter((dept) =>
             dept.volunteerMembers?.some(
-              m => m.volunteerID === user.volunteerId && m.membershipType === MembershipType.HEAD
-            )
+              (m) => m.volunteerID === user.volunteerId && m.membershipType === MembershipType.HEAD,
+            ),
           );
           setUserDepartments(myDepartments);
         } catch (error) {
@@ -52,71 +56,58 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     fetchUserDepartments();
   }, [user]);
 
-  // Initialize auth state from storage
+  // ----- Subscribe to Firebase Auth state — single source of truth -----
   useEffect(() => {
-    const initAuth = () => {
-      const token = storage.getToken();
-      const savedUser = storage.getUser();
-
-      if (token && savedUser) {
-        setUser(savedUser);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (fbUser) {
+        try {
+          const appUser = await buildAuthUser(fbUser);
+          setUser(appUser);
+        } catch (err) {
+          console.error('Failed to build AuthUser:', err);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
       }
       setIsLoading(false);
-    };
+    });
 
-    initAuth();
+    return unsubscribe;
   }, []);
 
+  // ----- Login with email + password -----
   const login = async (credentials: LoginDTO) => {
-    try {
-      // Use real login API now that backend is ready
-      const response = await authApi.login(credentials);
-      
-      storage.setToken(response.token);
-      
-      // Fetch full user details to get volunteerId
-      try {
-        const fullUser = await authApi.getCurrentUser();
-        storage.setUser(fullUser);
-        setUser(fullUser);
-      } catch (err) {
-        console.error('Failed to fetch full user details:', err);
-        // Fallback: construct user object from login response
-        const user: AuthUser = {
-          id: response.userId,
-          username: response.username,
-          volunteerId: '', // Will need to be fetched later
-          accessLevel: response.accessLevel,
-          createdAt: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          isDisabled: false,
-        };
-        storage.setUser(user);
-        setUser(user);
-      }
-    } catch (error) {
-      storage.clear();
-      throw error;
-    }
+    const appUser = await authApi.login(credentials);
+    setUser(appUser);
   };
 
-  const logout = () => {
-    storage.clear();
+  // ----- Login with OAuth provider (popup) -----
+  const loginWithProvider = async (
+    providerId: 'google.com' | 'github.com' | 'microsoft.com',
+  ) => {
+    const appUser = await authApi.loginWithProvider(providerId);
+    setUser(appUser);
+  };
+
+  // ----- Sign out -----
+  const logout = async () => {
+    await authApi.logout();
     setUser(null);
-    window.location.href = '/';
+    setFirebaseUser(null);
   };
 
-  const setTokenHelper = (token: string) => {
-    storage.setToken(token);
-  };
-
-  const setUserHelper = (newUser: AuthUser | null) => {
-    if (newUser) {
-      storage.setUser(newUser);
+  // ----- Force-refresh the current user's token + profile -----
+  const refreshUser = async () => {
+    if (firebaseUser) {
+      await authApi.refreshToken();
+      const updated = await buildAuthUser(firebaseUser);
+      setUser(updated);
     }
-    setUser(newUser);
   };
 
+  // ----- Role helpers -----
   const hasRole = (role: AccessLevel): boolean => {
     if (!user) return false;
     return user.accessLevel <= role; // Lower number = higher access
@@ -127,16 +118,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const isHeadOfDepartment = (departmentId: string): boolean => {
     if (isAdmin) return true;
-    return userDepartments.some(dept => dept.id === departmentId);
+    return userDepartments.some((dept) => dept.id === departmentId);
   };
 
   const canManageVolunteer = (volunteerId: string): boolean => {
     if (isAdmin) return true;
     if (!isDeptHead) return false;
-    
-    // Check if volunteer belongs to any department the user heads
-    return userDepartments.some(userDept =>
-      userDept.volunteerMembers?.some(m => m.volunteerID === volunteerId)
+    return userDepartments.some((dept) =>
+      dept.volunteerMembers?.some((m) => m.volunteerID === volunteerId),
     );
   };
 
@@ -144,18 +133,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         user,
+        firebaseUser,
         userDepartments,
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithProvider,
         logout,
         hasRole,
         isAdmin,
         isDeptHead,
         isHeadOfDepartment,
         canManageVolunteer,
-        setUser: setUserHelper,
-        setToken: setTokenHelper,
+        refreshUser,
       }}
     >
       {children}
@@ -169,6 +159,6 @@ export const useAuth = () => {
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  console.log('AuthContext:', context);
   return context;
 };
+
