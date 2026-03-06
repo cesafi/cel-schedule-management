@@ -43,24 +43,28 @@ type AccessLevel = (typeof ACCESS_LEVEL)[keyof typeof ACCESS_LEVEL];
 // Helpers
 // ---------------------------------------------------------------------------
 
+// PascalCase to match the Go backend's SystemLog struct field names.
 type LogEntry = {
-  type: string;
-  category: string;
-  severity: 'INFO' | 'WARNING' | 'ERROR';
-  timeDetected: admin.firestore.Timestamp;
-  metadata: Record<string, unknown>;
-  isArchived: boolean;
-  lastUpdated: admin.firestore.Timestamp;
+  Type: string;
+  Category: string;
+  Severity: 'INFO' | 'WARNING' | 'ERROR';
+  TimeDetected: admin.firestore.Timestamp;
+  Metadata: Record<string, unknown>;
+  IsArchived: boolean;
+  LastUpdated: admin.firestore.Timestamp;
 };
 
-const writeLog = async (entry: Omit<LogEntry, 'timeDetected' | 'isArchived' | 'lastUpdated'>) => {
+const writeLog = async (entry: { type: string; category: string; severity: 'INFO' | 'WARNING' | 'ERROR'; metadata: Record<string, unknown> }) => {
   const now = admin.firestore.Timestamp.now();
   await db.collection(COLLECTIONS.logs).add({
-    ...entry,
-    timeDetected: now,
-    isArchived: false,
-    lastUpdated: now,
-  });
+    Type: entry.type,
+    Category: entry.category,
+    Severity: entry.severity,
+    Metadata: entry.metadata,
+    TimeDetected: now,
+    IsArchived: false,
+    LastUpdated: now,
+  } satisfies LogEntry);
 };
 
 /**
@@ -105,6 +109,8 @@ export const onVolunteerWrite = onDocumentWritten(
     };
 
     const afterData = event.data?.after?.data() as Record<string, unknown> | undefined;
+    const beforeData = event.data?.before?.data() as Record<string, unknown> | undefined;
+    const resolvedData = afterData ?? beforeData;
     const isDisabled = afterData?.['IsDisabled'] as boolean | undefined;
 
     let logType = logTypeMap[changeType];
@@ -118,7 +124,7 @@ export const onVolunteerWrite = onDocumentWritten(
       severity: 'INFO',
       metadata: {
         volunteerId: event.params.volunteerId,
-        volunteerName: (afterData?.['Name'] as string | undefined) ?? '',
+        volunteerName: (resolvedData?.['Name'] as string | undefined) ?? '',
         changeType,
       },
     });
@@ -136,6 +142,8 @@ export const onDepartmentWrite = onDocumentWritten(
     };
 
     const afterData = event.data?.after?.data() as Record<string, unknown> | undefined;
+    const beforeData = event.data?.before?.data() as Record<string, unknown> | undefined;
+    const resolvedData = afterData ?? beforeData;
 
     await writeLog({
       type: logTypeMap[changeType],
@@ -143,7 +151,7 @@ export const onDepartmentWrite = onDocumentWritten(
       severity: 'INFO',
       metadata: {
         departmentId: event.params.departmentId,
-        departmentName: (afterData?.['DepartmentName'] as string | undefined) ?? '',
+        departmentName: (resolvedData?.['DepartmentName'] as string | undefined) ?? '',
         changeType,
       },
     });
@@ -161,6 +169,8 @@ export const onEventWrite = onDocumentWritten(
     };
 
     const afterData = event.data?.after?.data() as Record<string, unknown> | undefined;
+    const beforeData = event.data?.before?.data() as Record<string, unknown> | undefined;
+    const resolvedData = afterData ?? beforeData;
 
     await writeLog({
       type: logTypeMap[changeType],
@@ -168,7 +178,7 @@ export const onEventWrite = onDocumentWritten(
       severity: 'INFO',
       metadata: {
         eventId: event.params.eventId,
-        eventName: (afterData?.['Name'] as string | undefined) ?? '',
+        eventName: (resolvedData?.['Name'] as string | undefined) ?? '',
         changeType,
       },
     });
@@ -201,13 +211,14 @@ export const onUserWrite = onDocumentWritten(
       if (beforeDisabled && !afterDisabled) logType = 'USER_ENABLED';
     }
 
+    const resolvedData = afterData ?? beforeData;
     await writeLog({
       type: logType,
       category: 'user_management',
       severity: 'INFO',
       metadata: {
         uid: event.params.uid,
-        username: (afterData?.['username'] as string | undefined) ?? '',
+        username: (resolvedData?.['username'] as string | undefined) ?? '',
         changeType,
       },
     });

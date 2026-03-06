@@ -565,6 +565,7 @@ export const firestoreService = {
       includeArchived?: boolean;
       limit?: number;
     }) {
+      // Go backend writes PascalCase fields; Cloud Functions are being updated to match.
       const constraints = [];
       if (!filters?.includeArchived) {
         constraints.push(where('IsArchived', '==', false));
@@ -573,12 +574,23 @@ export const firestoreService = {
       constraints.push(orderBy('TimeDetected', 'desc'));
 
       const q = query(collection(db, COLLECTIONS.logs), ...constraints);
-      const snapshot = await getDocs(q);
+      console.log('[Logs] Fetching with filters:', filters);
+      let snapshot;
+      try {
+        snapshot = await getDocs(q);
+      } catch (err) {
+        console.error('[Logs] getDocs FAILED:', err);
+        throw err;
+      }
+      console.log('[Logs] Raw snapshot size:', snapshot.size);
+      console.log('[Logs] Raw docs (first 3):', snapshot.docs.slice(0, 3).map((d) => ({ id: d.id, ...d.data() })));
+      // convertFirestoreData normalises PascalCase → camelCase and Timestamps → ISO strings.
       const logs = snapshot.docs.map((d) => ({
         id: d.id,
         ...(convertFirestoreData(d.data()) as object),
       }));
-      // Client-side entity-scoped filtering (Cloud Function triggers tag these fields)
+      console.log('[Logs] After conversion (first 3):', logs.slice(0, 3));
+      // Client-side entity-scoped filtering (metadata keys are always camelCase)
       let filtered = logs as Array<Record<string, unknown>>;
       if (filters?.volunteerId) {
         filtered = filtered.filter(
@@ -597,7 +609,9 @@ export const firestoreService = {
         );
       }
       const limit = filters?.limit ?? 200;
-      return filtered.slice(0, limit);
+      const result = filtered.slice(0, limit);
+      console.log('[Logs] Final result count:', result.length, '| Sample:', result[0]);
+      return result;
     },
 
     async getArchivedLogs() {
@@ -607,7 +621,10 @@ export const firestoreService = {
         orderBy('TimeDetected', 'desc'),
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => ({ id: d.id, ...(convertFirestoreData(d.data()) as object) }));
+      return snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as object),
+      }));
     },
 
     async getStats() {
@@ -619,14 +636,18 @@ export const firestoreService = {
       const bySeverity: Record<string, number> = {};
       let archived = 0;
       for (const l of logs) {
-        if (l['Type']) byType[l['Type'] as string] = (byType[l['Type'] as string] ?? 0) + 1;
-        if (l['Category']) byCategory[l['Category'] as string] = (byCategory[l['Category'] as string] ?? 0) + 1;
-        if (l['Severity']) bySeverity[l['Severity'] as string] = (bySeverity[l['Severity'] as string] ?? 0) + 1;
-        if (l['IsArchived']) archived++;
+        // Handle both PascalCase (Go backend) and camelCase (Cloud Functions) field names.
+        const type = (l['Type'] ?? l['type']) as string | undefined;
+        const category = (l['Category'] ?? l['category']) as string | undefined;
+        const severity = (l['Severity'] ?? l['severity']) as string | undefined;
+        if (type) byType[type] = (byType[type] ?? 0) + 1;
+        if (category) byCategory[category] = (byCategory[category] ?? 0) + 1;
+        if (severity) bySeverity[severity] = (bySeverity[severity] ?? 0) + 1;
+        if (l['IsArchived'] || l['isArchived']) archived++;
       }
       const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       const recentLogs = logs.filter((l) => {
-        const t = l['TimeDetected'];
+        const t = l['TimeDetected'] ?? l['timeDetected'];
         if (t instanceof Timestamp) return t.toMillis() > oneWeekAgo;
         return false;
       }).length;

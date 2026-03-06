@@ -256,30 +256,35 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
   const columns: ColumnsType<SystemLog> = [
     {
       title: 'Time',
-      dataIndex: 'TimeDetected',
-      key: 'TimeDetected',
+      dataIndex: 'timeDetected',
+      key: 'timeDetected',
       width: 180,
       fixed: 'left',
-      render: (timestamp: string) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{formatTimestamp(timestamp)}</Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            {new Date(timestamp).toLocaleString()}
-          </Text>
-        </Space>
-      ),
+      render: (timestamp: string | { toDate: () => Date }) => {
+        const iso = typeof timestamp === 'string'
+          ? timestamp
+          : timestamp?.toDate?.().toISOString() ?? '';
+        return (
+          <Space direction="vertical" size={0}>
+            <Text strong>{formatTimestamp(iso)}</Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {new Date(iso).toLocaleString()}
+            </Text>
+          </Space>
+        );
+      },
     },
     {
       title: 'Type',
-      dataIndex: 'Type',
-      key: 'Type',
+      dataIndex: 'type',
+      key: 'type',
       width: 200,
       render: (type: LogType) => <Text>{formatLogType(type)}</Text>,
     },
     {
       title: 'Category',
-      dataIndex: 'Category',
-      key: 'Category',
+      dataIndex: 'category',
+      key: 'category',
       width: 150,
       responsive: ['md'],
       render: (category: string) => (
@@ -288,8 +293,8 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
     },
     {
       title: 'Severity',
-      dataIndex: 'Severity',
-      key: 'Severity',
+      dataIndex: 'severity',
+      key: 'severity',
       width: 100,
       responsive: ['sm'],
       render: (severity: string) => (
@@ -298,9 +303,9 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
     },
     {
       title: 'Details',
-      key: 'Details',
+      key: 'details',
       render: (_: unknown, record: SystemLog) => {
-        const summary = getLogSummary(record.Type, record.Metadata);
+        const summary = getLogSummary(record.type, record.metadata);
         return summary !== '—'
           ? <Text>{summary}</Text>
           : <Text type="secondary">—</Text>;
@@ -327,7 +332,7 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
         columns={columns}
         dataSource={logs}
         loading={loading}
-        rowKey="ID"
+        rowKey="id"
         scroll={{ x: 'max-content' }}
         pagination={pagination ? {
           current: pagination.current,
@@ -339,8 +344,8 @@ export const LogsTable: React.FC<LogsTableProps> = ({ logs, loading, pagination 
           responsive: true,
         } : false}
         expandable={{
-          expandedRowRender: (record) => renderMetadata(record.Metadata),
-          rowExpandable: (record) => Object.keys(record.Metadata || {}).length > 0,
+          expandedRowRender: (record) => renderMetadata(record.metadata),
+          rowExpandable: (record) => Object.keys(record.metadata || {}).length > 0,
         }}
         size="middle"
       />

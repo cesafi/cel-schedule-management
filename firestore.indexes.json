@@ -1,4 +1,30 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "IsArchived", "order": "ASCENDING" },
+        { "fieldPath": "TimeDetected", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "IsArchived", "order": "ASCENDING" },
+        { "fieldPath": "Type", "order": "ASCENDING" },
+        { "fieldPath": "TimeDetected", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "IsArchived", "order": "ASCENDING" },
+        { "fieldPath": "TimeDetected", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

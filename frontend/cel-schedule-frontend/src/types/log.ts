@@ -3,15 +3,15 @@ import { LogType } from './enums';
 // System Log types
 
 export interface SystemLog {
-  ID: string;
-  Type: LogType;
-  TimeDetected: string;
-  Metadata: Record<string, unknown>;
-  LastUpdated: string;
-  Category: string;
-  Severity: string;
-  IsArchived: boolean;
-  ArchiveDate?: string;
+  id: string;
+  type: LogType;
+  timeDetected: string;
+  metadata: Record<string, unknown>;
+  lastUpdated: string;
+  category: string;
+  severity: string;
+  isArchived: boolean;
+  archiveDate?: string;
 }
 
 export interface LogFilters {
