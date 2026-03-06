@@ -116,6 +116,7 @@ export const onVolunteerWrite = onDocumentWritten(
     let logType = logTypeMap[changeType];
     if (changeType === 'updated' && isDisabled !== undefined) {
       if (isDisabled) logType = 'VOLUNTEER_DISABLED';
+      else logType = 'VOLUNTEER_ENABLED';
     }
 
     await writeLog({
@@ -135,26 +136,52 @@ export const onDepartmentWrite = onDocumentWritten(
   `${COLLECTIONS.departments}/{departmentId}`,
   async (event) => {
     const changeType = resolveChangeType(event);
-    const logTypeMap = {
-      created: 'DEPARTMENT_CREATED',
-      updated: 'DEPARTMENT_UPDATED',
-      deleted: 'DEPARTMENT_DELETED',
-    };
-
     const afterData = event.data?.after?.data() as Record<string, unknown> | undefined;
     const beforeData = event.data?.before?.data() as Record<string, unknown> | undefined;
     const resolvedData = afterData ?? beforeData;
+    const deptId = event.params.departmentId;
+    const deptName = (resolvedData?.['DepartmentName'] as string | undefined) ?? '';
 
-    await writeLog({
-      type: logTypeMap[changeType],
-      category: 'department_management',
-      severity: 'INFO',
-      metadata: {
-        departmentId: event.params.departmentId,
-        departmentName: (resolvedData?.['DepartmentName'] as string | undefined) ?? '',
-        changeType,
-      },
+    if (changeType === 'created') {
+      await writeLog({ type: 'DEPARTMENT_CREATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: deptName, changeType } });
+      return;
+    }
+    if (changeType === 'deleted') {
+      await writeLog({ type: 'DEPARTMENT_DELETED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: deptName, changeType } });
+      return;
+    }
+
+    // changeType === 'updated' — detect sub-operations by comparing VolunteerMembers
+    type RawMember = { VolunteerID: string; MembershipType: string };
+    const beforeMembers = (beforeData?.['VolunteerMembers'] ?? []) as RawMember[];
+    const afterMembers = (afterData?.['VolunteerMembers'] ?? []) as RawMember[];
+    const beforeIds = new Set(beforeMembers.map((m) => m.VolunteerID));
+    const afterIds = new Set(afterMembers.map((m) => m.VolunteerID));
+    const addedIds = [...afterIds].filter((id) => !beforeIds.has(id));
+    const removedIds = [...beforeIds].filter((id) => !afterIds.has(id));
+    const roleChanges = afterMembers.filter((am) => {
+      const bm = beforeMembers.find((m) => m.VolunteerID === am.VolunteerID);
+      return bm && bm.MembershipType !== am.MembershipType;
     });
+
+    let loggedSubOperation = false;
+
+    for (const volunteerId of addedIds) {
+      await writeLog({ type: 'DEPARTMENT_MEMBER_ADDED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: deptName, volunteerId, changeType: 'member_added' } });
+      loggedSubOperation = true;
+    }
+    for (const volunteerId of removedIds) {
+      await writeLog({ type: 'DEPARTMENT_MEMBER_REMOVED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: deptName, volunteerId, changeType: 'member_removed' } });
+      loggedSubOperation = true;
+    }
+    for (const member of roleChanges) {
+      const oldRole = beforeMembers.find((m) => m.VolunteerID === member.VolunteerID)?.MembershipType;
+      await writeLog({ type: 'DEPARTMENT_ROLE_CHANGED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: deptName, volunteerId: member.VolunteerID, oldRole, newRole: member.MembershipType, changeType: 'role_changed' } });
+      loggedSubOperation = true;
+    }
+    if (!loggedSubOperation) {
+      await writeLog({ type: 'DEPARTMENT_UPDATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: deptName, changeType } });
+    }
   },
 );
 
@@ -162,26 +189,82 @@ export const onEventWrite = onDocumentWritten(
   `${COLLECTIONS.events}/{eventId}`,
   async (event) => {
     const changeType = resolveChangeType(event);
-    const logTypeMap = {
-      created: 'EVENT_CREATED',
-      updated: 'EVENT_UPDATED',
-      deleted: 'EVENT_DELETED',
-    };
-
     const afterData = event.data?.after?.data() as Record<string, unknown> | undefined;
     const beforeData = event.data?.before?.data() as Record<string, unknown> | undefined;
     const resolvedData = afterData ?? beforeData;
+    const eventId = event.params.eventId;
+    const eventName = (resolvedData?.['Name'] as string | undefined) ?? '';
 
-    await writeLog({
-      type: logTypeMap[changeType],
-      category: 'event_management',
-      severity: 'INFO',
-      metadata: {
-        eventId: event.params.eventId,
-        eventName: (resolvedData?.['Name'] as string | undefined) ?? '',
-        changeType,
-      },
+    if (changeType === 'created') {
+      await writeLog({ type: 'EVENT_CREATED', category: 'event_management', severity: 'INFO', metadata: { eventId, eventName, changeType } });
+      return;
+    }
+    if (changeType === 'deleted') {
+      await writeLog({ type: 'EVENT_DELETED', category: 'event_management', severity: 'INFO', metadata: { eventId, eventName, changeType } });
+      return;
+    }
+
+    // changeType === 'updated' — detect sub-operations by comparing array fields
+    const beforeGroups = (beforeData?.['AssignedGroups'] ?? []) as string[];
+    const afterGroups = (afterData?.['AssignedGroups'] ?? []) as string[];
+    const addedDepts = afterGroups.filter((id) => !beforeGroups.includes(id));
+    const removedDepts = beforeGroups.filter((id) => !afterGroups.includes(id));
+
+    const beforeScheduled = (beforeData?.['ScheduledVolunteers'] ?? []) as string[];
+    const afterScheduled = (afterData?.['ScheduledVolunteers'] ?? []) as string[];
+    const scheduledVolunteers = afterScheduled.filter((id) => !beforeScheduled.includes(id));
+    const unscheduledVolunteers = beforeScheduled.filter((id) => !afterScheduled.includes(id));
+
+    type RawStatus = { VolunteerID: string; TimeIn?: string; TimeOut?: string; AttendanceType?: string };
+    const beforeStatuses = (beforeData?.['Statuses'] ?? []) as RawStatus[];
+    const afterStatuses = (afterData?.['Statuses'] ?? []) as RawStatus[];
+
+    const timedInStatuses = afterStatuses.filter((ast) => {
+      const bst = beforeStatuses.find((s) => s.VolunteerID === ast.VolunteerID);
+      return ast.TimeIn && (!bst || !bst.TimeIn);
     });
+    const timedOutStatuses = afterStatuses.filter((ast) => {
+      const bst = beforeStatuses.find((s) => s.VolunteerID === ast.VolunteerID);
+      return ast.TimeOut && (!bst || !bst.TimeOut);
+    });
+    const attendanceUpdated = afterStatuses.filter((ast) => {
+      const bst = beforeStatuses.find((s) => s.VolunteerID === ast.VolunteerID);
+      return bst && ast.AttendanceType !== undefined && bst.AttendanceType !== ast.AttendanceType;
+    });
+
+    let loggedSubOperation = false;
+
+    for (const deptId of addedDepts) {
+      await writeLog({ type: 'EVENT_DEPARTMENT_ADDED', category: 'event_management', severity: 'INFO', metadata: { eventId, eventName, departmentId: deptId, changeType: 'department_added' } });
+      loggedSubOperation = true;
+    }
+    for (const deptId of removedDepts) {
+      await writeLog({ type: 'EVENT_DEPARTMENT_REMOVED', category: 'event_management', severity: 'INFO', metadata: { eventId, eventName, departmentId: deptId, changeType: 'department_removed' } });
+      loggedSubOperation = true;
+    }
+    for (const volunteerId of scheduledVolunteers) {
+      await writeLog({ type: 'VOLUNTEER_SCHEDULED', category: 'attendance', severity: 'INFO', metadata: { eventId, eventName, volunteerId, changeType: 'volunteer_scheduled' } });
+      loggedSubOperation = true;
+    }
+    for (const volunteerId of unscheduledVolunteers) {
+      await writeLog({ type: 'VOLUNTEER_UNSCHEDULED', category: 'attendance', severity: 'INFO', metadata: { eventId, eventName, volunteerId, changeType: 'volunteer_unscheduled' } });
+      loggedSubOperation = true;
+    }
+    for (const status of timedInStatuses) {
+      await writeLog({ type: 'VOLUNTEER_TIMED_IN', category: 'attendance', severity: 'INFO', metadata: { eventId, eventName, volunteerId: status.VolunteerID, timeIn: status.TimeIn ?? '' } });
+      loggedSubOperation = true;
+    }
+    for (const status of timedOutStatuses) {
+      await writeLog({ type: 'VOLUNTEER_TIMED_OUT', category: 'attendance', severity: 'INFO', metadata: { eventId, eventName, volunteerId: status.VolunteerID, timeOut: status.TimeOut ?? '' } });
+      loggedSubOperation = true;
+    }
+    for (const status of attendanceUpdated) {
+      await writeLog({ type: 'ATTENDANCE_STATUS_UPDATED', category: 'attendance', severity: 'INFO', metadata: { eventId, eventName, volunteerId: status.VolunteerID, attendanceType: status.AttendanceType ?? '' } });
+      loggedSubOperation = true;
+    }
+    if (!loggedSubOperation) {
+      await writeLog({ type: 'EVENT_UPDATED', category: 'event_management', severity: 'INFO', metadata: { eventId, eventName, changeType } });
+    }
   },
 );
 

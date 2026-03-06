@@ -20,6 +20,7 @@ import {
 import { db } from '../config/firebase';
 import { Volunteer, EventSchedule, Department } from '../types';
 import type { UserProfile } from '../types/authUser';
+import { clientWriteLog } from '../utils/clientLog';
 import type {
   VolunteerCreateDTO,
   VolunteerUpdateDTO,
@@ -95,6 +96,14 @@ export const firestoreService = {
   // Users (replaces auth_users — stores UserProfile per Firebase UID)
   // ==========================================================================
   users: {
+    async getAll(): Promise<UserProfile[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.users));
+      return snapshot.docs.map((d) => ({
+        uid: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<UserProfile, 'uid'>),
+      })) as UserProfile[];
+    },
+
     async getById(uid: string): Promise<UserProfile> {
       const docRef = doc(db, COLLECTIONS.users, uid);
       const snap = await getDoc(docRef);
@@ -155,7 +164,9 @@ export const firestoreService = {
         collection(db, COLLECTIONS.volunteers),
         withCreationTimestamps({ Name: data.name }),
       );
-      return firestoreService.volunteers.getById(ref.id);
+      const volunteer = await firestoreService.volunteers.getById(ref.id);
+      await clientWriteLog({ type: 'VOLUNTEER_CREATED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: volunteer.id, volunteerName: volunteer.name } });
+      return volunteer;
     },
 
     async update(id: string, data: VolunteerUpdateDTO): Promise<Volunteer> {
@@ -164,25 +175,35 @@ export const firestoreService = {
       if (data.name !== undefined) payload['Name'] = data.name;
       if (data.isDisabled !== undefined) payload['IsDisabled'] = data.isDisabled;
       await updateDoc(docRef, withTimestamps(payload));
-      return firestoreService.volunteers.getById(id);
+      const volunteer = await firestoreService.volunteers.getById(id);
+      const logType = data.isDisabled === true
+        ? 'VOLUNTEER_DISABLED'
+        : data.isDisabled === false
+          ? 'VOLUNTEER_ENABLED'
+          : 'VOLUNTEER_UPDATED';
+      await clientWriteLog({ type: logType, category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id, volunteerName: volunteer.name } });
+      return volunteer;
     },
 
     /** Soft-delete — sets IsDisabled = true */
     async delete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.volunteers, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+      await clientWriteLog({ type: 'VOLUNTEER_DISABLED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id } });
     },
 
     /** Restore — sets IsDisabled = false */
     async restore(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.volunteers, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+      await clientWriteLog({ type: 'VOLUNTEER_ENABLED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id } });
     },
 
     /** Hard delete — permanently removes the document from Firestore */
     async hardDelete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.volunteers, id);
       await deleteDoc(docRef);
+      await clientWriteLog({ type: 'VOLUNTEER_DELETED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id } });
     },
   },
 
@@ -243,7 +264,9 @@ export const firestoreService = {
           ],
         }),
       );
-      return firestoreService.departments.getById(ref.id);
+      const dept = await firestoreService.departments.getById(ref.id);
+      await clientWriteLog({ type: 'DEPARTMENT_CREATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: dept.id, departmentName: dept.departmentName } });
+      return dept;
     },
 
     async update(id: string, data: DepartmentUpdateDTO): Promise<Department> {
@@ -252,25 +275,30 @@ export const firestoreService = {
       if (data.name !== undefined) payload['DepartmentName'] = data.name;
       if (data.isDisabled !== undefined) payload['IsDisabled'] = data.isDisabled;
       await updateDoc(docRef, withTimestamps(payload));
-      return firestoreService.departments.getById(id);
+      const dept = await firestoreService.departments.getById(id);
+      await clientWriteLog({ type: 'DEPARTMENT_UPDATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id, departmentName: dept.departmentName } });
+      return dept;
     },
 
     /** Soft-delete */
     async delete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.departments, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+      await clientWriteLog({ type: 'DEPARTMENT_DELETED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id } });
     },
 
     /** Restore — sets IsDisabled = false */
     async restore(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.departments, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+      await clientWriteLog({ type: 'DEPARTMENT_UPDATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id, changeType: 'restored' } });
     },
 
     /** Hard delete — permanently removes the document from Firestore */
     async hardDelete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.departments, id);
       await deleteDoc(docRef);
+      await clientWriteLog({ type: 'DEPARTMENT_DELETED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id } });
     },
 
     async addMember(deptId: string, data: AddMemberDTO): Promise<Department> {
@@ -285,7 +313,9 @@ export const firestoreService = {
         }),
         LastUpdated: serverTimestamp(),
       });
-      return firestoreService.departments.getById(deptId);
+      const dept = await firestoreService.departments.getById(deptId);
+      await clientWriteLog({ type: 'DEPARTMENT_MEMBER_ADDED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: dept.departmentName, volunteerId: data.volunteerId, membershipType: data.membershipType } });
+      return dept;
     },
 
     async updateMember(
@@ -311,6 +341,7 @@ export const firestoreService = {
         })),
         LastUpdated: serverTimestamp(),
       });
+      await clientWriteLog({ type: 'DEPARTMENT_ROLE_CHANGED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: dept.departmentName, volunteerId, newRole: data.membershipType } });
       return firestoreService.departments.getById(deptId);
     },
 
@@ -332,6 +363,7 @@ export const firestoreService = {
           VolunteerMembers: arrayRemove(toRemove),
           LastUpdated: serverTimestamp(),
         });
+        await clientWriteLog({ type: 'DEPARTMENT_MEMBER_REMOVED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: dept.departmentName, volunteerId } });
       }
     },
   },
@@ -390,7 +422,9 @@ export const firestoreService = {
           Statuses: [],
         }),
       );
-      return firestoreService.events.getById(ref.id);
+      const event = await firestoreService.events.getById(ref.id);
+      await clientWriteLog({ type: 'EVENT_CREATED', category: 'event_management', severity: 'INFO', metadata: { eventId: event.id, eventName: event.name } });
+      return event;
     },
 
     async update(id: string, data: EventUpdateDTO): Promise<EventSchedule> {
@@ -405,25 +439,30 @@ export const firestoreService = {
       if (data.assignedGroups !== undefined) payload['AssignedGroups'] = data.assignedGroups;
       if (data.isDisabled !== undefined) payload['IsDisabled'] = data.isDisabled;
       await updateDoc(docRef, withTimestamps(payload));
-      return firestoreService.events.getById(id);
+      const event = await firestoreService.events.getById(id);
+      await clientWriteLog({ type: 'EVENT_UPDATED', category: 'event_management', severity: 'INFO', metadata: { eventId: id, eventName: event.name } });
+      return event;
     },
 
     /** Soft-delete */
     async delete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.events, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+      await clientWriteLog({ type: 'EVENT_DELETED', category: 'event_management', severity: 'INFO', metadata: { eventId: id } });
     },
 
     /** Restore — sets IsDisabled = false */
     async restore(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.events, id);
       await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+      await clientWriteLog({ type: 'EVENT_UPDATED', category: 'event_management', severity: 'INFO', metadata: { eventId: id, changeType: 'restored' } });
     },
 
     /** Hard delete — permanently removes the document from Firestore */
     async hardDelete(id: string): Promise<void> {
       const docRef = doc(db, COLLECTIONS.events, id);
       await deleteDoc(docRef);
+      await clientWriteLog({ type: 'EVENT_DELETED', category: 'event_management', severity: 'INFO', metadata: { eventId: id } });
     },
 
     async addStatus(eventId: string, data: AddStatusDTO): Promise<EventSchedule> {
@@ -436,7 +475,9 @@ export const firestoreService = {
         }),
         LastUpdated: serverTimestamp(),
       });
-      return firestoreService.events.getById(eventId);
+      const event = await firestoreService.events.getById(eventId);
+      await clientWriteLog({ type: 'VOLUNTEER_SCHEDULED', category: 'attendance', severity: 'INFO', metadata: { eventId, eventName: event.name, volunteerId: data.volunteerID } });
+      return event;
     },
 
     async updateStatus(
@@ -457,12 +498,12 @@ export const firestoreService = {
             }
           : s,
       );
-      // Touch to suppress unused var warning
       void event;
       await updateDoc(doc(db, COLLECTIONS.events, eventId), {
         Statuses: updatedStatuses,
         LastUpdated: serverTimestamp(),
       });
+      await clientWriteLog({ type: 'ATTENDANCE_STATUS_UPDATED', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId, ...(data.attendanceType !== undefined ? { attendanceType: data.attendanceType } : {}) } });
       return firestoreService.events.getById(eventId);
     },
 
@@ -478,6 +519,7 @@ export const firestoreService = {
         Statuses: updatedStatuses,
         LastUpdated: serverTimestamp(),
       });
+      await clientWriteLog({ type: 'VOLUNTEER_TIMED_IN', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId, timeIn: data.timeIn ?? new Date().toISOString() } });
     },
 
     async timeOut(eventId: string, volunteerId: string, data: TimeOutDTO): Promise<void> {
@@ -492,6 +534,7 @@ export const firestoreService = {
         Statuses: updatedStatuses,
         LastUpdated: serverTimestamp(),
       });
+      await clientWriteLog({ type: 'VOLUNTEER_TIMED_OUT', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId, timeOut: data.timeOut ?? new Date().toISOString() } });
     },
 
     async addDepartments(eventId: string, departmentIds: string[]): Promise<void> {
@@ -500,6 +543,9 @@ export const firestoreService = {
         AssignedGroups: arrayUnion(...departmentIds),
         LastUpdated: serverTimestamp(),
       });
+      for (const departmentId of departmentIds) {
+        await clientWriteLog({ type: 'EVENT_DEPARTMENT_ADDED', category: 'event_management', severity: 'INFO', metadata: { eventId, departmentId } });
+      }
     },
 
     async removeDepartment(eventId: string, departmentId: string): Promise<void> {
@@ -508,6 +554,7 @@ export const firestoreService = {
         AssignedGroups: arrayRemove(departmentId),
         LastUpdated: serverTimestamp(),
       });
+      await clientWriteLog({ type: 'EVENT_DEPARTMENT_REMOVED', category: 'event_management', severity: 'INFO', metadata: { eventId, departmentId } });
     },
 
     async removeVolunteer(eventId: string, volunteerId: string): Promise<void> {
@@ -521,6 +568,7 @@ export const firestoreService = {
       };
       if (toRemove) updates['Statuses'] = arrayRemove(toRemove);
       await updateDoc(doc(db, COLLECTIONS.events, eventId), updates);
+      await clientWriteLog({ type: 'VOLUNTEER_UNSCHEDULED', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId } });
     },
 
     /** Returns all events where a given volunteer has a status entry */

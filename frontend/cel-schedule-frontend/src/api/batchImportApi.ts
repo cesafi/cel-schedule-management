@@ -11,6 +11,7 @@
  */
 import * as XLSX from 'xlsx';
 import { firestoreService } from '../services/firestore';
+import { clientWriteLog } from '../utils/clientLog';
 import type {
   BatchImportPreviewResponse,
   BatchImportExecuteRequest,
@@ -257,6 +258,19 @@ export const batchImportApi = {
     const createdVolunteerIds: string[] = [];
     const createdDepartmentIds: string[] = [];
 
+    const totalDepartments = request._departments.length;
+    const totalVolunteersToImport = request._departments.reduce(
+      (sum, d) => sum + 1 + d.members.length,
+      0,
+    );
+
+    await clientWriteLog({
+      type: 'BATCH_IMPORT_STARTED',
+      category: 'batch_operations',
+      severity: 'INFO',
+      metadata: { totalDepartments, totalVolunteers: totalVolunteersToImport },
+    });
+
     try {
       for (const dept of request._departments) {
         // Resolve head
@@ -304,6 +318,17 @@ export const batchImportApi = {
         }
       }
 
+      await clientWriteLog({
+        type: 'BATCH_IMPORT_COMPLETED',
+        category: 'batch_operations',
+        severity: 'INFO',
+        metadata: {
+          departmentsCreated: createdDepartmentIds.length,
+          volunteersCreated,
+          volunteersReused,
+        },
+      });
+
       return {
         success: true,
         departmentsCreated: createdDepartmentIds.length,
@@ -314,6 +339,12 @@ export const batchImportApi = {
       };
     } catch (err) {
       const e = err as { message?: string };
+      await clientWriteLog({
+        type: 'BATCH_IMPORT_FAILED',
+        category: 'batch_operations',
+        severity: 'ERROR',
+        metadata: { error: e.message ?? 'Batch import failed' },
+      });
       return {
         success: false,
         departmentsCreated: 0,
