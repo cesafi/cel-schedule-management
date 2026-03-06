@@ -1,69 +1,68 @@
-import apiClient from './client';
 import { firestoreService } from '../services/firestore';
-import { Department, DepartmentCreateDTO, DepartmentUpdateDTO, AddMemberDTO, UpdateMemberDTO, StatusHistoryItem } from '../types';
-import type { LogListResponse } from '../types/log';
+import {
+  Department,
+  DepartmentCreateDTO,
+  DepartmentUpdateDTO,
+  AddMemberDTO,
+  UpdateMemberDTO,
+} from '../types';
+import type { EventSchedule } from '../types/event';
 
 export const departmentsApi = {
-  // Get all departments - Direct from Firebase (no cold start!)
   async getAll(): Promise<Department[]> {
     return firestoreService.departments.getAll();
   },
 
-  // Get department by ID - Direct from Firebase (no cold start!)
+  /** Fetch all departments including soft-deleted ones — for admin use only */
+  async getAllIncludingDisabled(): Promise<Department[]> {
+    return firestoreService.departments.getAllIncludingDisabled();
+  },
+
+
   async getById(id: string): Promise<Department> {
     return firestoreService.departments.getById(id);
   },
 
-  // Get department status history
-  async getStatusHistory(id: string): Promise<StatusHistoryItem[]> {
-    const response = await apiClient.get<StatusHistoryItem[]>(`/departments/${id}/status-history`);
-    console.log("fetched status history for department:", response.data);
-    return response.data;
+  async getStatusHistory(id: string): Promise<EventSchedule[]> {
+    return firestoreService.events.getStatusHistoryForDepartment(id);
   },
 
-  // Create department
   async create(data: DepartmentCreateDTO): Promise<Department> {
-    const response = await apiClient.post<Department>('/departments', data);
-    console.log("created department:", response.data);
-    return response.data;
+    return firestoreService.departments.create(data);
   },
 
-  // Update department
   async update(id: string, data: DepartmentUpdateDTO): Promise<Department> {
-    const response = await apiClient.put<Department>(`/departments/${id}`, data);
-    console.log("updated department:", response.data);
-    return response.data;
+    return firestoreService.departments.update(id, data);
   },
 
-  // Delete department (soft delete)
   async delete(id: string): Promise<void> {
-    await apiClient.delete(`/departments/${id}`);
-    console.log("deleted department with id:", id);
+    return firestoreService.departments.delete(id);
   },
 
-  // Add member to department
+  /** Restore — sets IsDisabled = false in Firestore */
+  async restore(id: string): Promise<void> {
+    return firestoreService.departments.restore(id);
+  },
+
+  /** Hard delete — permanently removes the document from Firestore */
+  async hardDelete(id: string): Promise<void> {
+    return firestoreService.departments.hardDelete(id);
+  },
+
   async addMember(id: string, data: AddMemberDTO): Promise<Department> {
-    const response = await apiClient.post<Department>(`/departments/${id}/members`, data);
-    console.log("added member to department:", response.data);
-    return response.data;
+    return firestoreService.departments.addMember(id, data);
   },
 
-  // Update member type
   async updateMember(id: string, volunteerId: string, data: UpdateMemberDTO): Promise<Department> {
-    const response = await apiClient.put<Department>(`/departments/${id}/members/${volunteerId}`, data);
-    console.log("updated member in department:", response.data);
-    return response.data;
+    return firestoreService.departments.updateMember(id, volunteerId, data);
   },
 
-  // Remove member from department
   async removeMember(id: string, volunteerId: string): Promise<void> {
-    await apiClient.delete(`/departments/${id}/members/${volunteerId}`);
-    console.log("removed member from department:", volunteerId);
+    return firestoreService.departments.removeMember(id, volunteerId);
   },
 
-  // Get logs for department (admin only)
-  async getLogs(id: string, params?: { limit?: number; offset?: number }): Promise<LogListResponse> {
-    const response = await apiClient.get<LogListResponse>(`/departments/${id}/logs`, { params });
-    return response.data;
+  async getLogs(id: string, params?: { limit?: number }): Promise<import('../types/log').LogListResponse> {
+    const logs = await firestoreService.logs.getAll({ departmentId: id, limit: params?.limit });
+    return { logs: logs as unknown as import('../types/log').SystemLog[], total: logs.length };
   },
 };

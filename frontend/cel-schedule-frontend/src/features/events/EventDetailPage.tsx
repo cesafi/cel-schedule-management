@@ -1,14 +1,15 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Form, Select, Space, Input, Tabs, Popconfirm } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, EnvironmentOutlined, FileTextOutlined, EditOutlined, RollbackOutlined } from '@ant-design/icons';
 import { eventsApi } from '../../api';
-import { Volunteer, Department, AddStatusDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
+import { Volunteer, Department, AddStatusDTO, EventCreateDTO, EventUpdateDTO, TimeInDTO, TimeOutDTO } from '../../types';
 import { AttendanceType, TimeOutType } from '../../types/enums';
 import { format } from 'date-fns';
 import { useAuth } from '../auth';
 import { AddVolunteerToEventModal } from './modals/AddVolunteerToEventModal';
 import { AddDepartmentToEventModal } from './modals/AddDepartmentToEventModal';
+import { EventFormModal } from './modals/EventFormModal';
 import { useEvent, useVolunteers, useDepartments, useVolunteerMap, useDepartmentMap, useEntityLogs } from '../../hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { eventKeys } from '../../hooks/useEvents';
@@ -24,15 +25,18 @@ export const EventDetailPage: React.FC = () => {
   
   const [addDeptModalOpen, setAddDeptModalOpen] = useState(false);
   const [addVolunteerModalOpen, setAddVolunteerModalOpen] = useState(false);
+  const [editEventModalOpen, setEditEventModalOpen] = useState(false);
   const [editingTimeIn, setEditingTimeIn] = useState<string | null>(null);
   const [editingTimeOut, setEditingTimeOut] = useState<string | null>(null);
   const [timeInForm] = Form.useForm();
   const [timeOutForm] = Form.useForm();
   const [filterDepartment, setFilterDepartment] = useState<string | null>(null);
+  const [filterVolunteerSearch, setFilterVolunteerSearch] = useState('');
   const [logPage, setLogPage] = useState(1);
   const logPageSize = 20;
   const [filterTimeIn, setFilterTimeIn] = useState<string | null>(null);
   const [filterTimeOut, setFilterTimeOut] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Fetch data using React Query hooks
   const { data: event, isLoading: eventLoading } = useEvent(id);
@@ -64,12 +68,47 @@ export const EventDetailPage: React.FC = () => {
     }
   }, [id, queryClient]);
 
+  const handleRestore = useCallback(async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await eventsApi.restore(id);
+      message.success('Event restored successfully');
+      refetchEvent();
+    } catch (err) {
+      console.error('Failed to restore event:', err);
+      message.error('Failed to restore event');
+    } finally {
+      setActionLoading(false);
+    }
+  }, [id, refetchEvent]);
+
+  const handleHardDelete = useCallback(async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await eventsApi.hardDelete(id);
+      message.success('Event permanently deleted');
+      navigate('/schedules');
+    } catch (err) {
+      console.error('Failed to permanently delete event:', err);
+      message.error('Failed to permanently delete event');
+      setActionLoading(false);
+    }
+  }, [id, navigate]);
+
   const handleTimeIn = useCallback(async (volunteerId: string, values: { timeIn?: string; attendanceType: AttendanceType }) => {
     if (!id) return;
     
     try {
+      const buildLocalISOString = (timeStr: string): string => {
+        const now = new Date();
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const local = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        return local.toISOString();
+      };
       const data: TimeInDTO = {
-        timeIn: values.timeIn ? `${new Date().toISOString().split('T')[0]}T${values.timeIn}:00Z` : undefined,
+        timeIn: values.timeIn ? buildLocalISOString(values.timeIn) : undefined,
         timeInType: values.attendanceType || AttendanceType.PRESENT,
       };
       await eventsApi.timeIn(id, volunteerId, data);
@@ -83,13 +122,19 @@ export const EventDetailPage: React.FC = () => {
     }
   }, [id, refetchEvent, timeInForm]);
 
-  const handleTimeOut = useCallback(async (volunteerId: string, values: { timeOut?: string }) => {
+  const handleTimeOut = useCallback(async (volunteerId: string, values: { timeOut?: string; timeOutType?: TimeOutType }) => {
     if (!id) return;
     
     try {
+      const buildLocalISOString = (timeStr: string): string => {
+        const now = new Date();
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const local = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        return local.toISOString();
+      };
       const data: TimeOutDTO = {
-        timeOut: values.timeOut ? `${new Date().toISOString().split('T')[0]}T${values.timeOut}:00Z` : undefined,
-        timeOutType: 'On-Time',
+        timeOut: values.timeOut ? buildLocalISOString(values.timeOut) : undefined,
+        timeOutType: values.timeOutType || TimeOutType.ONTIME,
       };
       await eventsApi.timeOut(id, volunteerId, data);
       message.success('Volunteer checked out successfully');
@@ -228,7 +273,7 @@ export const EventDetailPage: React.FC = () => {
         return new Date(a.timeIn).getTime() - new Date(b.timeIn).getTime();
       },
       render: (time: string, record: StatusRecord) => {
-        if (!record.attendanceType && editingTimeIn === record.volunteerID) {
+        if (editingTimeIn === record.volunteerID) {
           return (
             <Form
               form={timeInForm}
@@ -250,6 +295,12 @@ export const EventDetailPage: React.FC = () => {
               <Form.Item name="timeIn" style={{ marginBottom: 0 }}>
                 <Input type="time" placeholder="Time" style={{ width: 100 }} />
               </Form.Item>
+              <Button
+                size="small"
+                onClick={() => timeInForm.setFieldsValue({ timeIn: format(new Date(), 'HH:mm') })}
+              >
+                Now
+              </Button>
               <Button type="primary" size="small" htmlType="submit">
                 Submit
               </Button>
@@ -312,7 +363,7 @@ export const EventDetailPage: React.FC = () => {
         return new Date(a.timeOut).getTime() - new Date(b.timeOut).getTime();
       },
       render: (time: string, record: StatusRecord) => {
-        if (!record.timeOutType && editingTimeOut === record.volunteerID) {
+        if (editingTimeOut === record.volunteerID) {
           return (
             <Form
               form={timeOutForm}
@@ -335,6 +386,12 @@ export const EventDetailPage: React.FC = () => {
               <Form.Item name="timeOut" style={{ marginBottom: 0 }}>
                 <Input type="time" placeholder="Time" style={{ width: 100 }} />
               </Form.Item>
+              <Button
+                size="small"
+                onClick={() => timeOutForm.setFieldsValue({ timeOut: format(new Date(), 'HH:mm') })}
+              >
+                Now
+              </Button>
               <Button type="primary" size="small" htmlType="submit">
                 Submit
               </Button>
@@ -489,7 +546,15 @@ export const EventDetailPage: React.FC = () => {
   const filteredAttendance = useMemo(() => {
     if (!event) return [];
     
+    const searchTerm = filterVolunteerSearch.trim().toLowerCase();
+
     return (event.statuses || []).filter((record) => {
+      // Filter by volunteer name search
+      if (searchTerm) {
+        const name = volunteerMap.get(record.volunteerID)?.name?.toLowerCase() ?? '';
+        if (!name.includes(searchTerm)) return false;
+      }
+
       // Filter by department
       if (filterDepartment) {
         const volunteerDepts = getVolunteerDepartments(record.volunteerID);
@@ -514,7 +579,7 @@ export const EventDetailPage: React.FC = () => {
 
       return true;
     });
-  }, [event, filterDepartment, filterTimeIn, filterTimeOut, getVolunteerDepartments]);
+  }, [event, filterVolunteerSearch, filterDepartment, filterTimeIn, filterTimeOut, getVolunteerDepartments, volunteerMap]);
 
   // Unused for now - TODO: implement volunteer table feature
   // const scheduledVolunteerColumns = [
@@ -552,6 +617,20 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
+  const handleEditEvent = async (data: EventCreateDTO) => {
+    if (!id) return;
+    try {
+      await eventsApi.update(id, data);
+      message.success('Event updated successfully');
+      setEditEventModalOpen(false);
+      refetchEvent();
+    } catch (err) {
+      console.error('Failed to update event:', err);
+      message.error('Failed to update event');
+      throw err;
+    }
+  };
+
   // Add conditional returns AFTER all hooks
   if (loading) {
     return (
@@ -576,7 +655,42 @@ export const EventDetailPage: React.FC = () => {
       </Button>
 
       <Card>
-        <Title level={2}>{event.name}</Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>{event.name}</Title>
+          {isAdmin && (
+            <Space wrap>
+              <Button icon={<EditOutlined />} onClick={() => setEditEventModalOpen(true)}>
+                Edit Event
+              </Button>
+              {event.isDisabled && (
+                <Popconfirm
+                  title="Restore Event"
+                  description="Are you sure you want to restore this event? It will become active again."
+                  onConfirm={handleRestore}
+                  okText="Restore"
+                  cancelText="Cancel"
+                  okButtonProps={{ loading: actionLoading }}
+                >
+                  <Button icon={<RollbackOutlined />} type="primary">
+                    Restore
+                  </Button>
+                </Popconfirm>
+              )}
+              <Popconfirm
+                title="Permanently Delete Event"
+                description="This action cannot be undone. The event and all its data will be permanently removed."
+                onConfirm={handleHardDelete}
+                okText="Delete Permanently"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: actionLoading }}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={actionLoading}>
+                  Hard Delete
+                </Button>
+              </Popconfirm>
+            </Space>
+          )}
+        </div>
         <Descriptions bordered column={2}>
           <Descriptions.Item label="Description" span={2}>
             {event.description}
@@ -616,7 +730,7 @@ export const EventDetailPage: React.FC = () => {
 
       <Card style={{ marginTop: 24 }}>
         <Tabs
-          defaultActiveKey="departments"
+          defaultActiveKey="attendance"
           items={[
             {
               key: 'attendance',
@@ -625,6 +739,13 @@ export const EventDetailPage: React.FC = () => {
                 <>
                   <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <Space wrap>
+                      <Input.Search
+                        placeholder="Search volunteer..."
+                        allowClear
+                        value={filterVolunteerSearch}
+                        onChange={e => setFilterVolunteerSearch(e.target.value)}
+                        style={{ width: 200 }}
+                      />
                       <Select
                         placeholder="Filter by Department"
                         style={{ width: 200 }}
@@ -741,10 +862,21 @@ export const EventDetailPage: React.FC = () => {
       {/* Add Volunteer Modal */}
       <AddVolunteerToEventModal
         open={addVolunteerModalOpen}
-        availableVolunteers={volunteers.filter((v: Volunteer) => !v.isDisabled && !event.statuses?.some(s => s.volunteerID === v.id))}
+        allVolunteers={volunteers.filter((v: Volunteer) => !v.isDisabled)}
+        assignedVolunteerIds={event.statuses?.map(s => s.volunteerID) || []}
         departments={departments}
+        assignedDepartmentIds={event.assignedGroups || []}
         onCancel={() => setAddVolunteerModalOpen(false)}
         onSubmit={handleAddVolunteersToAttendance}
+      />
+
+      {/* Edit Event Modal */}
+      <EventFormModal
+        open={editEventModalOpen}
+        event={event}
+        departments={departments}
+        onCancel={() => setEditEventModalOpen(false)}
+        onSubmit={handleEditEvent}
       />
     </div>
   );

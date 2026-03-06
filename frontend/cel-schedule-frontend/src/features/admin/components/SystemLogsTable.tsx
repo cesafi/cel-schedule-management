@@ -38,17 +38,17 @@ export const SystemLogsTable = ({
   const columns: ColumnsType<SystemLog> = [
     {
       title: 'Timestamp',
-      dataIndex: 'TimeDetected',
+      dataIndex: 'timeDetected',
       key: 'timestamp',
       width: 200,
       fixed: 'left',
       render: (time: string) => dayjs(time).format('YYYY-MM-DD HH:mm:ss'),
       sorter: (a: SystemLog, b: SystemLog) =>
-        dayjs(a.TimeDetected).unix() - dayjs(b.TimeDetected).unix(),
+        dayjs(a.timeDetected as string).unix() - dayjs(b.timeDetected as string).unix(),
     },
     {
       title: 'Log Type',
-      dataIndex: 'Type',
+      dataIndex: 'type',
       key: 'type',
       width: 200,
       render: (type: string) => (
@@ -61,8 +61,8 @@ export const SystemLogsTable = ({
       width: 200,
       responsive: ['md'],
       render: (_: unknown, record: SystemLog) => {
-        const username = record.Metadata?.username as string | undefined;
-        const userId = record.Metadata?.userId as string | undefined;
+        const username = record.metadata?.username as string | undefined;
+        const userId = record.metadata?.uid as string | undefined;
         return (
           <div>
             {username && <Text strong>{username}</Text>}
@@ -82,9 +82,9 @@ export const SystemLogsTable = ({
       key: 'details',
       responsive: ['lg'],
       render: (_: unknown, record: SystemLog) => {
-        const metadata = record.Metadata || {};
+        const metadata = record.metadata || {};
         const keys = Object.keys(metadata).filter(
-          (k) => k !== 'userId' && k !== 'username'
+          (k) => k !== 'uid' && k !== 'username'
         );
 
         if (keys.length === 0) return <Text type="secondary">No additional details</Text>;
@@ -107,7 +107,7 @@ export const SystemLogsTable = ({
   ];
 
   const expandedRowRender = (record: SystemLog) => {
-    const metadata = record.Metadata || {};
+    const metadata = record.metadata || {};
     return (
       <Card size="small" title="Full Metadata" style={{ maxWidth: 800 }}>
         <pre style={{ margin: 0, fontSize: '12px' }}>
@@ -135,7 +135,7 @@ export const SystemLogsTable = ({
       <Table
         columns={columns}
         dataSource={logs}
-        rowKey="ID"
+        rowKey="id"
         loading={loading}
         pagination={{
           current: currentPage,

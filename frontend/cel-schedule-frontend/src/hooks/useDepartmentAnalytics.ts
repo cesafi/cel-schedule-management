@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { departmentsApi } from '../api';
 import { DepartmentAnalytics, MemberPerformance, Volunteer } from '../types';
-import { EventSchedule, ScheduleStatus } from '../types/event';
+import { EventSchedule } from '../types/event';
 import {
   calculateAttendanceRate,
   calculatePunctualityRate,
@@ -25,14 +25,14 @@ interface UseDepartmentAnalyticsReturn {
 }
 
 export function useDepartmentAnalytics(departmentId: string): UseDepartmentAnalyticsReturn {
-  // Fetch department status history (all events the department was assigned to)
-  const { data: statusHistory, isLoading: historyLoading, error } = useQuery({
+  // Backend returns full EventSchedule[] with all member statuses populated
+  const { data: events = [], isLoading: eventsLoading, error } = useQuery<EventSchedule[]>({
     queryKey: ['department-status-history', departmentId],
     queryFn: () => departmentsApi.getStatusHistory(departmentId),
     enabled: !!departmentId,
   });
 
-  // Fetch department details for member information
+  // Fetch department details for member list
   const { data: department, isLoading: deptLoading } = useQuery({
     queryKey: ['department', departmentId],
     queryFn: () => departmentsApi.getById(departmentId),
@@ -41,61 +41,26 @@ export function useDepartmentAnalytics(departmentId: string): UseDepartmentAnaly
 
   // Fetch all volunteers for name lookup
   const { data: volunteers, isLoading: volunteersLoading } = useVolunteers();
-  const volunteerMap = useMemo(() => new Map((volunteers || []).map((v: Volunteer) => [v.id, v])), [volunteers]);
+  const volunteerMap = useMemo(
+    () => new Map((volunteers || []).map((v: Volunteer) => [v.id, v])),
+    [volunteers],
+  );
 
-  const isLoading = historyLoading || deptLoading || volunteersLoading;
+  const isLoading = eventsLoading || deptLoading || volunteersLoading;
 
-  // Convert StatusHistoryItem[] to EventSchedule[] format
-  // Group by event and collect all member statuses for each event
-  const events = useMemo((): EventSchedule[] => {
-    if (!statusHistory) return [];
+  // All statuses across all events (department-wide)
+  const allStatuses = useMemo(
+    () => events.flatMap(e => e.statuses || []),
+    [events],
+  );
 
-    const eventMap = new Map<string, EventSchedule>();
-
-    statusHistory.forEach(item => {
-      if (!eventMap.has(item.eventId)) {
-        eventMap.set(item.eventId, {
-          id: item.eventId,
-          name: item.eventName,
-          description: '',
-          timeAndDate: item.timeAndDate,
-          scheduledVolunteers: [],
-          voluntaryVolunteers: [],
-          assignedGroups: [departmentId],
-          statuses: [],
-          createdAt: '',
-          updatedAt: '',
-          isDisabled: false,
-        });
-      }
-
-      const event = eventMap.get(item.eventId)!;
-      
-      // Skip items without status information
-      if (!item.status) return;
-      
-      // The backend might return individual statuses or aggregated
-      // Based on research, status history returns individual volunteer statuses
-      // We need to extract volunteer ID from the status (this might need adjustment based on actual API response)
-      event.statuses.push({
-        volunteerID: item.status.attendanceType ? 'unknown' : '', // API doesn't return volunteer ID in status
-        timeIn: item.status.timeIn,
-        timeOut: item.status.timeOut,
-        attendanceType: item.status.attendanceType as AttendanceType | undefined,
-      });
-    });
-
-    return Array.from(eventMap.values());
-  }, [statusHistory, departmentId]);
-
-  // Calculate department-wide statistics
+  // Department-wide statistics
   const stats = useMemo((): DepartmentAnalytics | null => {
     if (!events.length || !department) return null;
 
-    const allStatuses = events.flatMap(e => e.statuses || []);
     const distribution = getAttendanceDistribution(allStatuses);
 
-    // Calculate active members (attended event in last 30 days)
+    // Active members = those who have a check-in in any event within the last 30 days
     const activeMemberIds = new Set<string>();
     events.forEach(event => {
       if (isActiveMember([event], 30)) {
@@ -121,68 +86,50 @@ export function useDepartmentAnalytics(departmentId: string): UseDepartmentAnaly
       absentCount: distribution.absent,
       activeMembers: activeMemberIds.size,
       totalMembers: department.volunteerMembers?.length || 0,
-      upcomingEventsCount: 0, // Calculated separately with useUpcomingEvents
+      upcomingEventsCount: 0, // Handled separately by useUpcomingEvents
     };
-  }, [events, department]);
+  }, [events, department, allStatuses]);
 
   const distribution = useMemo((): AttendanceDistribution | null => {
     if (!events.length) return null;
-    const allStatuses = events.flatMap(e => e.statuses || []);
     return getAttendanceDistribution(allStatuses);
-  }, [events]);
+  }, [events, allStatuses]);
 
   const trendData = useMemo((): TrendDataPoint[] => {
     if (!events.length) return [];
     return groupStatusesByMonth(events);
   }, [events]);
 
-  // Calculate performance for each member
+  // Per-member analytics — filter each member's own statuses across all events
   const memberPerformance = useMemo((): MemberPerformance[] => {
-    if (!department?.volunteerMembers || !statusHistory) return [];
-
-    const performanceMap = new Map<string, {
-      statuses: ScheduleStatus[];
-      events: EventSchedule[];
-    }>();
-
-    // Group statuses by volunteer
-    // Note: The current StatusHistoryItem structure doesn't clearly separate volunteer IDs
-    // This is a limitation that might need backend adjustment
-    // For now, we'll calculate based on department members and available events
-    
-    department.volunteerMembers.forEach(member => {
-      const volunteer = volunteerMap.get(member.volunteerID);
-      if (!volunteer) return;
-      
-      // This is a simplified calculation - ideally we'd filter events per volunteer
-      const memberStatuses = events.flatMap(e => e.statuses || []);
-      getAttendanceDistribution(memberStatuses);
-      
-      performanceMap.set(member.volunteerID, {
-        statuses: memberStatuses,
-        events: events,
-      });
-    });
+    if (!department?.volunteerMembers || !events.length) return [];
 
     return department.volunteerMembers
       .map(member => {
         const volunteer = volunteerMap.get(member.volunteerID);
         if (!volunteer) return null;
 
-        const data = performanceMap.get(member.volunteerID);
-        if (!data) return null;
+        // Only statuses that belong to this volunteer
+        const memberStatuses = events.flatMap(e =>
+          (e.statuses || []).filter(s => s.volunteerID === member.volunteerID),
+        );
+
+        // Count events where this volunteer has any status entry
+        const eventsAttended = events.filter(e =>
+          (e.statuses || []).some(s => s.volunteerID === member.volunteerID),
+        ).length;
 
         return {
           volunteerId: member.volunteerID,
           volunteerName: volunteer.name || 'Unknown',
-          eventsAttended: data.events.length,
-          attendanceRate: calculateAttendanceRate(data.statuses),
-          punctualityRate: calculatePunctualityRate(data.statuses),
+          eventsAttended,
+          attendanceRate: calculateAttendanceRate(memberStatuses),
+          punctualityRate: calculatePunctualityRate(memberStatuses),
         };
       })
       .filter((p): p is MemberPerformance => p !== null)
-      .sort((a, b) => b.attendanceRate - a.attendanceRate); // Sort by attendance rate
-  }, [department, statusHistory, events, volunteerMap]);
+      .sort((a, b) => b.attendanceRate - a.attendanceRate);
+  }, [department, events, volunteerMap]);
 
   return {
     stats,

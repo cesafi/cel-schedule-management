@@ -52,7 +52,7 @@ func (rs *RetentionScheduler) Start(ctx context.Context) {
 	}
 
 	// Calculate time until next midnight
-	now := time.Now()
+	now := time.Now().UTC()
 	nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
 	timeUntilMidnight := nextMidnight.Sub(now)
 
@@ -95,10 +95,10 @@ func (rs *RetentionScheduler) Stop() {
 // runArchival performs the log archival process
 func (rs *RetentionScheduler) runArchival(ctx context.Context) {
 	log.Println("=== Starting automatic log archival ===")
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 
 	// Calculate cutoff date
-	cutoffDate := time.Now().AddDate(0, 0, -rs.retentionDays)
+	cutoffDate := time.Now().UTC().AddDate(0, 0, -rs.retentionDays)
 	cutoffDateStr := cutoffDate.Format("2006-01-02")
 
 	log.Printf("Archiving logs older than %s (%d days)", cutoffDateStr, rs.retentionDays)
@@ -112,8 +112,8 @@ func (rs *RetentionScheduler) runArchival(ctx context.Context) {
 		errorLog := &models.SystemLog{
 			ID:           uuid.New().String(),
 			Type:         sub_model.SYSTEM_ERROR,
-			TimeDetected: time.Now(),
-			LastUpdated:  time.Now(),
+			TimeDetected: time.Now().UTC(),
+			LastUpdated:  time.Now().UTC(),
 			Category:     "System",
 			Severity:     sub_model.SEVERITY_ERROR,
 			Metadata: map[string]interface{}{
@@ -138,8 +138,8 @@ func (rs *RetentionScheduler) runArchival(ctx context.Context) {
 	successLog := &models.SystemLog{
 		ID:           uuid.New().String(),
 		Type:         sub_model.CONFIGURATION_CHANGED,
-		TimeDetected: time.Now(),
-		LastUpdated:  time.Now(),
+		TimeDetected: time.Now().UTC(),
+		LastUpdated:  time.Now().UTC(),
 		Category:     "System",
 		Severity:     sub_model.SEVERITY_INFO,
 		Metadata: map[string]interface{}{
@@ -160,7 +160,7 @@ func (rs *RetentionScheduler) runArchival(ctx context.Context) {
 func (rs *RetentionScheduler) RunManualArchival(ctx context.Context) (int, error) {
 	log.Println("Manual log archival triggered")
 
-	cutoffDate := time.Now().AddDate(0, 0, -rs.retentionDays)
+	cutoffDate := time.Now().UTC().AddDate(0, 0, -rs.retentionDays)
 	cutoffDateStr := cutoffDate.Format("2006-01-02")
 	archivedCount, err := rs.repo.ArchiveLogsOlderThan(ctx, cutoffDateStr)
 

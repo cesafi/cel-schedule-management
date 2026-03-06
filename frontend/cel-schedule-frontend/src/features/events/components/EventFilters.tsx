@@ -139,8 +139,8 @@ export const EventFilters: React.FC<EventFiltersProps> = ({
             />
           </Col>
 
-          {/* Status Filter */}
-          <Col xs={24} sm={12} md={dateRange === 'custom' ? 12 : 6}>
+          {/* Status Filter - temporarily disabled */}
+          {/* <Col xs={24} sm={12} md={dateRange === 'custom' ? 12 : 6}>
             <Select
               mode="multiple"
               style={{ width: '100%' }}
@@ -154,7 +154,7 @@ export const EventFilters: React.FC<EventFiltersProps> = ({
                 { label: 'Needs Volunteers', value: 'needs-volunteers' },
               ]}
             />
-          </Col>
+          </Col> */}
 
           {/* Location Filter */}
           <Col xs={24} sm={12} md={dateRange === 'custom' ? 12 : 6}>

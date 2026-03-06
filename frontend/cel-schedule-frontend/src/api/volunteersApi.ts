@@ -1,46 +1,55 @@
-import apiClient from './client';
 import { firestoreService } from '../services/firestore';
-import { Volunteer, VolunteerCreateDTO, VolunteerUpdateDTO, StatusHistoryItem } from '../types';
-import type { LogListResponse } from '../types/log';
+import { Volunteer, VolunteerCreateDTO, VolunteerUpdateDTO } from '../types';
+import type { EventSchedule } from '../types/event';
 
 export const volunteersApi = {
-  // Get all volunteers - Direct from Firebase (no cold start!)
   async getAll(): Promise<Volunteer[]> {
     return firestoreService.volunteers.getAll();
   },
 
-  // Get volunteer by ID - Direct from Firebase (no cold start!)
+  /** Fetch all volunteers including soft-deleted ones — for admin use only */
+  async getAllIncludingDisabled(): Promise<Volunteer[]> {
+    return firestoreService.volunteers.getAllIncludingDisabled();
+  },
+
+
   async getById(id: string): Promise<Volunteer> {
     return firestoreService.volunteers.getById(id);
   },
 
-  // Get volunteer status history
-  async getStatusHistory(id: string): Promise<StatusHistoryItem[]> {
-    const response = await apiClient.get<StatusHistoryItem[]>(`/volunteers/${id}/status-history`);
-    console.log("fetched volunteer status history:", response.data);
-    return response.data;
+  async getStatusHistory(id: string): Promise<EventSchedule[]> {
+    return firestoreService.events.getStatusHistoryForVolunteer(id);
   },
 
-  // Create volunteer
   async create(data: VolunteerCreateDTO): Promise<Volunteer> {
-    const response = await apiClient.post<Volunteer>('/volunteers', data);
-    return response.data;
+    return firestoreService.volunteers.create(data);
   },
 
-  // Update volunteer
   async update(id: string, data: VolunteerUpdateDTO): Promise<Volunteer> {
-    const response = await apiClient.put<Volunteer>(`/volunteers/${id}`, data);
-    return response.data;
+    return firestoreService.volunteers.update(id, data);
   },
 
-  // Delete volunteer (soft delete)
+  /** Soft-delete — sets IsDisabled = true in Firestore */
   async delete(id: string): Promise<void> {
-    await apiClient.delete(`/volunteers/${id}`);
+    return firestoreService.volunteers.delete(id);
   },
 
-  // Get logs for volunteer (admin only)
-  async getLogs(id: string, params?: { limit?: number; offset?: number }): Promise<LogListResponse> {
-    const response = await apiClient.get<LogListResponse>(`/volunteers/${id}/logs`, { params });
-    return response.data;
+  /** Restore — sets IsDisabled = false in Firestore */
+  async restore(id: string): Promise<void> {
+    return firestoreService.volunteers.restore(id);
+  },
+
+  /** Hard delete — permanently removes the document from Firestore */
+  async hardDelete(id: string): Promise<void> {
+    return firestoreService.volunteers.hardDelete(id);
+  },
+
+  /**
+   * Audit logs for a volunteer are written by the Cloud Function onWrite trigger.
+   * This queries the logs collection filtered by volunteerId in metadata.
+   */
+  async getLogs(id: string, params?: { limit?: number }): Promise<import('../types/log').LogListResponse> {
+    const logs = await firestoreService.logs.getAll({ volunteerId: id, limit: params?.limit });
+    return { logs: logs as unknown as import('../types/log').SystemLog[], total: logs.length };
   },
 };

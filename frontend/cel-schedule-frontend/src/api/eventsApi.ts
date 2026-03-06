@@ -1,89 +1,80 @@
-import apiClient from './client';
 import { firestoreService } from '../services/firestore';
-import { EventSchedule, EventCreateDTO, EventUpdateDTO, AddStatusDTO, UpdateStatusDTO, TimeInDTO, TimeOutDTO } from '../types';
-import type { LogListResponse } from '../types/log';
+import {
+  EventSchedule,
+  EventCreateDTO,
+  EventUpdateDTO,
+  AddStatusDTO,
+  UpdateStatusDTO,
+  TimeInDTO,
+  TimeOutDTO,
+} from '../types';
 
 export const eventsApi = {
-  // Get all events - Direct from Firebase (no cold start!)
   async getAll(): Promise<EventSchedule[]> {
     return firestoreService.events.getAll();
   },
 
-  // Get event by ID - Direct from Firebase (no cold start!)
+  /** Fetch all events including soft-deleted ones — for admin use only */
+  async getAllIncludingDisabled(): Promise<EventSchedule[]> {
+    return firestoreService.events.getAllIncludingDisabled();
+  },
+
   async getById(id: string): Promise<EventSchedule> {
     return firestoreService.events.getById(id);
   },
 
-  // Create event
   async create(data: EventCreateDTO): Promise<EventSchedule> {
-    const response = await apiClient.post<EventSchedule>('/events', data);
-    console.log("created event:", response.data);
-    return response.data;
+    return firestoreService.events.create(data);
   },
 
-  // Update event
   async update(id: string, data: EventUpdateDTO): Promise<EventSchedule> {
-    const response = await apiClient.put<EventSchedule>(`/events/${id}`, data);
-    console.log("updated event:", response.data);
-    return response.data;
+    return firestoreService.events.update(id, data);
   },
 
-  // Delete event (soft delete)
   async delete(id: string): Promise<void> {
-    await apiClient.delete(`/events/${id}`);
-    console.log("deleted event with id:", id);
+    return firestoreService.events.delete(id);
   },
 
-  // Add volunteer status (check-in)
+  /** Restore — sets IsDisabled = false in Firestore */
+  async restore(id: string): Promise<void> {
+    return firestoreService.events.restore(id);
+  },
+
+  /** Hard delete — permanently removes the document from Firestore */
+  async hardDelete(id: string): Promise<void> {
+    return firestoreService.events.hardDelete(id);
+  },
+
   async addStatus(id: string, data: AddStatusDTO): Promise<EventSchedule> {
-    const response = await apiClient.post<EventSchedule>(`/events/${id}/status`, data);
-    console.log("added status to event:", response.data);
-    return response.data;
+    return firestoreService.events.addStatus(id, data);
   },
 
-  // Update volunteer status (check-out)
   async updateStatus(id: string, volunteerId: string, data: UpdateStatusDTO): Promise<EventSchedule> {
-    const response = await apiClient.put<EventSchedule>(`/events/${id}/status/${volunteerId}`, data);
-    console.log("updated status in event:", response.data);
-    return response.data;
+    return firestoreService.events.updateStatus(id, volunteerId, data);
   },
 
-  // Time In volunteer
   async timeIn(id: string, volunteerId: string, data: TimeInDTO): Promise<void> {
-    await apiClient.put(`/events/${id}/status/${volunteerId}/TimeIn`, data);
-    console.log("timed in volunteer:", volunteerId);
+    return firestoreService.events.timeIn(id, volunteerId, data);
   },
 
-  // Time Out volunteer
   async timeOut(id: string, volunteerId: string, data: TimeOutDTO): Promise<void> {
-    await apiClient.put(`/events/${id}/status/${volunteerId}/TimeOut`, data);
-    console.log("timed out volunteer:", volunteerId);
+    return firestoreService.events.timeOut(id, volunteerId, data);
   },
 
-  // Add departments to event
   async addDepartmentsToEvent(id: string, departmentIds: string[]): Promise<void> {
-    await apiClient.put(`/events/${id}/AddDepartment`, {
-      departmentId: departmentIds
-    });
-    console.log("added departments to event:", departmentIds);
+    return firestoreService.events.addDepartments(id, departmentIds);
   },
 
-  // Remove department from event
   async removeDepartmentFromEvent(id: string, departmentId: string): Promise<void> {
-    await apiClient.delete(`/events/${id}/departments/${departmentId}`);
-    console.log("removed department from event:", departmentId);
+    return firestoreService.events.removeDepartment(id, departmentId);
   },
 
-  // Remove volunteer from event
   async removeVolunteerFromEvent(id: string, volunteerId: string): Promise<void> {
-    await apiClient.delete(`/events/${id}/status/${volunteerId}`);
-    console.log("removed volunteer from event:", volunteerId);
+    return firestoreService.events.removeVolunteer(id, volunteerId);
   },
 
-  // Get logs for event (admin only)
-  async getLogs(id: string, params?: { limit?: number; offset?: number }): Promise<LogListResponse> {
-    const response = await apiClient.get<LogListResponse>(`/events/${id}/logs`, { params });
-    return response.data;
+  async getLogs(id: string, params?: { limit?: number }): Promise<import('../types/log').LogListResponse> {
+    const logs = await firestoreService.logs.getAll({ eventId: id, limit: params?.limit });
+    return { logs: logs as unknown as import('../types/log').SystemLog[], total: logs.length };
   },
-
 };

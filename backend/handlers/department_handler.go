@@ -47,7 +47,7 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 	}
 
 	// Create the department with the initial head as a member
-	now := time.Now()
+	now := time.Now().UTC()
 	department := models.DepartmentModel{
 		DepartmentName: input.DepartmentName,
 		VolunteerMembers: []sub_model.MembershipInfo{
@@ -161,7 +161,7 @@ func (h *DepartmentHandler) AddMember(c *gin.Context) {
 	}
 
 	// Create MembershipInfo with timestamps
-	now := time.Now()
+	now := time.Now().UTC()
 	memberInfo := sub_model.MembershipInfo{
 		VolunteerID:    input.VolunteerID,
 		MembershipType: input.MembershipType,

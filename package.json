@@ -1,0 +1,24 @@
+{
+  "name": "cel-schedule-management",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cesafi/cel-schedule-management.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cesafi/cel-schedule-management/issues"
+  },
+  "homepage": "https://github.com/cesafi/cel-schedule-management#readme",
+  "dependencies": {
+    "firebase-admin": "^13.7.0"
+  }
+}

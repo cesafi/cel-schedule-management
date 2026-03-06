@@ -47,8 +47,8 @@ func (h *VolunteerHandler) Create(c *gin.Context) {
 	}
 	volunteer := models.VolunteerModel{
 		Name:        input.Name,
-		CreatedAt:   time.Now(),
-		LastUpdated: time.Now(),
+		CreatedAt:   time.Now().UTC(),
+		LastUpdated: time.Now().UTC(),
 		IsDisabled:  false,
 	}
 

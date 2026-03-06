@@ -16,12 +16,15 @@ export const VolunteersPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingVolunteer, setEditingVolunteer] = useState<Volunteer | null>(null);
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const fetchVolunteers = async () => {
+    if (!isAuthenticated) return;
     setLoading(true);
     try {
-      const data = await volunteersApi.getAll();
+      const data = isAdmin
+        ? await volunteersApi.getAllIncludingDisabled()
+        : await volunteersApi.getAll();
       setVolunteers(data);
     } catch (err) {
       console.error('Failed to load volunteers:', err);
@@ -32,8 +35,10 @@ export const VolunteersPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     fetchVolunteers();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated, isAdmin]);
 
   const handleCreate = () => {
     setEditingVolunteer(null);
@@ -80,6 +85,15 @@ export const VolunteersPage: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       sorter: (a: Volunteer, b: Volunteer) => a.name.localeCompare(b.name),
+      render: (name: string, record: Volunteer) => (
+        <Space size="small">
+          <span style={{
+            textDecoration: record.isDisabled ? 'line-through' : undefined,
+            color: record.isDisabled ? '#999' : undefined,
+          }}>{name}</span>
+          {isAdmin && record.isDisabled && <Tag color="red">Deleted</Tag>}
+        </Space>
+      ),
     },
     {
       title: 'Status',
@@ -87,7 +101,7 @@ export const VolunteersPage: React.FC = () => {
       key: 'isDisabled',
       render: (isDisabled: boolean) => (
         <Tag color={isDisabled ? 'red' : 'green'}>
-          {isDisabled ? 'Inactive' : 'Active'}
+          {isDisabled ? 'Deleted' : 'Active'}
         </Tag>
       ),
     },
@@ -95,7 +109,11 @@ export const VolunteersPage: React.FC = () => {
       title: 'Created',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date: string) => format(new Date(date), 'MMM dd, yyyy'),
+      render: (date: string) => {
+        if (!date) return '-';
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? '-' : format(d, 'MMM dd, yyyy');
+      },
     },
     {
       title: 'Actions',
@@ -109,7 +127,7 @@ export const VolunteersPage: React.FC = () => {
           >
             View
           </Button>
-          {isAdmin && (
+          {isAdmin && !record.isDisabled && (
             <>
               <Button
                 type="link"
@@ -136,8 +154,23 @@ export const VolunteersPage: React.FC = () => {
     },
   ];
 
+  const rowClassName = (record: Volunteer) =>
+    record.isDisabled ? 'volunteer-row-deleted' : '';
+
   return (
     <div>
+      <style>{`
+        .volunteer-row-deleted > td {
+          background-color: rgba(255, 77, 79, 0.07) !important;
+          opacity: 0.65;
+        }
+        .volunteer-row-deleted {
+          border-left: 4px solid #ff4d4f;
+        }
+        .volunteer-row-deleted:hover > td {
+          background-color: rgba(255, 77, 79, 0.12) !important;
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={2}>Volunteers</Title>
         {isAdmin && (
@@ -153,6 +186,7 @@ export const VolunteersPage: React.FC = () => {
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}
+        rowClassName={rowClassName}
       />
 
       <VolunteerFormModal
@@ -164,3 +198,4 @@ export const VolunteersPage: React.FC = () => {
     </div>
   );
 };
+

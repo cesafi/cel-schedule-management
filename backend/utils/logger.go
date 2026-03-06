@@ -31,10 +31,10 @@ func CreateAuditLog(c *gin.Context, db repository.Database, logType sub_model.Lo
 	// Create the log
 	systemLog := &models.SystemLog{
 		ID:           uuid.New().String(),
-		TimeDetected: time.Now(),
+		TimeDetected: time.Now().UTC(),
 		Type:         logType,
 		Metadata:     metadata,
-		LastUpdated:  time.Now(),
+		LastUpdated:  time.Now().UTC(),
 	}
 
 	// Attempt to save the log
@@ -62,10 +62,10 @@ func CreateAuditLogWithUserInfo(ctx context.Context, db repository.Database, log
 	// Create the log
 	systemLog := &models.SystemLog{
 		ID:           uuid.New().String(),
-		TimeDetected: time.Now(),
+		TimeDetected: time.Now().UTC(),
 		Type:         logType,
 		Metadata:     metadata,
-		LastUpdated:  time.Now(),
+		LastUpdated:  time.Now().UTC(),
 	}
 
 	// Attempt to save the log
@@ -83,10 +83,10 @@ func CreateAuditLogWithUserInfo(ctx context.Context, db repository.Database, log
 func CreateSystemLog(ctx context.Context, db repository.Database, logType sub_model.LogType, metadata map[string]interface{}) error {
 	systemLog := &models.SystemLog{
 		ID:           uuid.New().String(),
-		TimeDetected: time.Now(),
+		TimeDetected: time.Now().UTC(),
 		Type:         logType,
 		Metadata:     metadata,
-		LastUpdated:  time.Now(),
+		LastUpdated:  time.Now().UTC(),
 	}
 
 	err := db.Logs().CreateLog(ctx, systemLog)
@@ -120,10 +120,10 @@ func SafeLog(c *gin.Context, db repository.Database, logType sub_model.LogType, 
 func CreateLogWithSeverity(ctx context.Context, db repository.Database, logType sub_model.LogType, severity string, metadata map[string]interface{}) error {
 	systemLog := &models.SystemLog{
 		ID:           uuid.New().String(),
-		TimeDetected: time.Now(),
+		TimeDetected: time.Now().UTC(),
 		Type:         logType,
 		Metadata:     metadata,
-		LastUpdated:  time.Now(),
+		LastUpdated:  time.Now().UTC(),
 		Category:     sub_model.GetLogTypeCategory(logType),
 		Severity:     severity,
 		IsArchived:   false,
@@ -166,10 +166,10 @@ func CreateAttendanceLog(c *gin.Context, db repository.Database, logType sub_mod
 
 	systemLog := &models.SystemLog{
 		ID:           uuid.New().String(),
-		TimeDetected: time.Now(),
+		TimeDetected: time.Now().UTC(),
 		Type:         logType,
 		Metadata:     metadata,
-		LastUpdated:  time.Now(),
+		LastUpdated:  time.Now().UTC(),
 		Category:     sub_model.GetLogTypeCategory(logType),
 		Severity:     sub_model.SEVERITY_INFO,
 		IsArchived:   false,
@@ -204,10 +204,10 @@ func CreateEntityChangeLog(c *gin.Context, db repository.Database, logType sub_m
 
 	systemLog := &models.SystemLog{
 		ID:           uuid.New().String(),
-		TimeDetected: time.Now(),
+		TimeDetected: time.Now().UTC(),
 		Type:         logType,
 		Metadata:     metadata,
-		LastUpdated:  time.Now(),
+		LastUpdated:  time.Now().UTC(),
 		Category:     sub_model.GetLogTypeCategory(logType),
 		Severity:     sub_model.SEVERITY_INFO,
 		IsArchived:   false,
@@ -238,10 +238,10 @@ func CreateEnhancedLog(c *gin.Context, db repository.Database, logType sub_model
 
 	systemLog := &models.SystemLog{
 		ID:           uuid.New().String(),
-		TimeDetected: time.Now(),
+		TimeDetected: time.Now().UTC(),
 		Type:         logType,
 		Metadata:     metadata,
-		LastUpdated:  time.Now(),
+		LastUpdated:  time.Now().UTC(),
 		Category:     sub_model.GetLogTypeCategory(logType),
 		Severity:     severity,
 		IsArchived:   false,

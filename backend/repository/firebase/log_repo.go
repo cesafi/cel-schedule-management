@@ -28,10 +28,10 @@ func (r *logRepo) CreateLog(ctx context.Context, log *models.SystemLog) error {
 	}
 
 	if log.TimeDetected.IsZero() {
-		log.TimeDetected = time.Now()
+		log.TimeDetected = time.Now().UTC()
 	}
 
-	log.LastUpdated = time.Now()
+	log.LastUpdated = time.Now().UTC()
 
 	_, err := r.firestore.Collection(logsCollection).Doc(log.ID).Set(ctx, log)
 	if err != nil {
@@ -592,7 +592,7 @@ func (r *logRepo) ArchiveLogsOlderThan(ctx context.Context, beforeDate string) (
 		return 0, fmt.Errorf("failed to query logs: %v", err)
 	}
 
-	archiveDate := time.Now()
+	archiveDate := time.Now().UTC()
 	archivedCount := 0
 
 	batch := r.firestore.Batch()

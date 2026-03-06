@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Tabs, Row, Col } from 'antd';
-import { ArrowLeftOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FireOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Tabs, Row, Col, Popconfirm, Space } from 'antd';
+import { ArrowLeftOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FireOutlined, FileTextOutlined, RollbackOutlined, DeleteOutlined } from '@ant-design/icons';
 import { volunteersApi } from '../../api';
-import { Volunteer, StatusHistoryItem, Department, MembershipType, EventSchedule } from '../../types';
+import { Volunteer, Department, MembershipType, EventSchedule } from '../../types';
 import { format } from 'date-fns';
 import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
 import { useVolunteerAnalytics, useUpcomingEvents, useDepartments, useEntityLogs } from '../../hooks';
@@ -17,13 +17,14 @@ export const VolunteerDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const [volunteer, setVolunteer] = useState<Volunteer | null>(null);
-  const [history, setHistory] = useState<StatusHistoryItem[]>([]);
+  const [history, setHistory] = useState<EventSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [attendanceFilter, setAttendanceFilter] = useState<string>('ALL');
   const [logPage, setLogPage] = useState(1);
   const logPageSize = 20;
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Use analytics hooks
   const { stats, distribution, trendData } = useVolunteerAnalytics(id || '');
@@ -74,6 +75,36 @@ export const VolunteerDetailPage: React.FC = () => {
     fetchData();
   }, [id]);
 
+  const handleRestore = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await volunteersApi.restore(id);
+      const updated = await volunteersApi.getById(id);
+      setVolunteer(updated);
+      message.success('Volunteer restored successfully');
+    } catch (err) {
+      console.error('Failed to restore volunteer:', err);
+      message.error('Failed to restore volunteer');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await volunteersApi.hardDelete(id);
+      message.success('Volunteer permanently deleted');
+      navigate('/volunteers');
+    } catch (err) {
+      console.error('Failed to permanently delete volunteer:', err);
+      message.error('Failed to permanently delete volunteer');
+      setActionLoading(false);
+    }
+  };
+
   // Filter history by date range and attendance type - moved before early returns
   const filteredHistory = useMemo(() => {
     let filtered = history;
@@ -90,7 +121,10 @@ export const VolunteerDetailPage: React.FC = () => {
     
     // Filter by attendance type
     if (attendanceFilter !== 'ALL') {
-      filtered = filtered.filter(item => item.status.attendanceType === attendanceFilter);
+      filtered = filtered.filter(item => {
+        const ownStatus = (item.statuses || []).find(s => s.volunteerID === id);
+        return ownStatus?.attendanceType === attendanceFilter;
+      });
     }
     
     return filtered;
@@ -111,8 +145,8 @@ export const VolunteerDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'eventName',
-      key: 'eventName',
+      dataIndex: 'name',
+      key: 'name',
     },
     {
       title: 'Date',
@@ -122,9 +156,10 @@ export const VolunteerDetailPage: React.FC = () => {
     },
     {
       title: 'Attendance',
-      dataIndex: ['status', 'attendanceType'],
       key: 'attendanceType',
-      render: (type: string) => {
+      render: (_: unknown, record: EventSchedule) => {
+        const ownStatus = (record.statuses || []).find(s => s.volunteerID === id);
+        const type = ownStatus?.attendanceType;
         const colors: Record<string, string> = {
           PRESENT: 'green',
           LATE: 'orange',
@@ -136,21 +171,25 @@ export const VolunteerDetailPage: React.FC = () => {
     },
     {
       title: 'Time In',
-      dataIndex: ['status', 'timeIn'],
       key: 'timeIn',
-      render: (time: string) => time ? format(new Date(time), 'HH:mm') : '-',
+      render: (_: unknown, record: EventSchedule) => {
+        const ownStatus = (record.statuses || []).find(s => s.volunteerID === id);
+        return ownStatus?.timeIn ? format(new Date(ownStatus.timeIn), 'HH:mm') : '-';
+      },
     },
     {
       title: 'Time Out',
-      dataIndex: ['status', 'timeOut'],
       key: 'timeOut',
-      render: (time: string) => time ? format(new Date(time), 'HH:mm') : '-',
+      render: (_: unknown, record: EventSchedule) => {
+        const ownStatus = (record.statuses || []).find(s => s.volunteerID === id);
+        return ownStatus?.timeOut ? format(new Date(ownStatus.timeOut), 'HH:mm') : '-';
+      },
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: unknown, record: StatusHistoryItem) => (
-        <Button type="link" onClick={() => navigate(`/events/${record.eventId}`)}>
+      render: (_: unknown, record: EventSchedule) => (
+        <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
           View Event
         </Button>
       ),
@@ -397,7 +436,7 @@ export const VolunteerDetailPage: React.FC = () => {
           <Table
             columns={historyColumns}
             dataSource={filteredHistory}
-            rowKey="eventId"
+            rowKey="id"
             pagination={{ pageSize: 10 }}
             locale={{ emptyText: 'No attendance records match the current filters' }}
           />
@@ -443,7 +482,39 @@ export const VolunteerDetailPage: React.FC = () => {
       </Button>
 
       <Card>
-        <Title level={2}>{volunteer.name}</Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>{volunteer.name}</Title>
+          {isAdmin && (
+            <Space wrap>
+              {volunteer.isDisabled && (
+                <Popconfirm
+                  title="Restore Volunteer"
+                  description="Are you sure you want to restore this volunteer? They will become active again."
+                  onConfirm={handleRestore}
+                  okText="Restore"
+                  cancelText="Cancel"
+                  okButtonProps={{ loading: actionLoading }}
+                >
+                  <Button icon={<RollbackOutlined />} type="primary">
+                    Restore
+                  </Button>
+                </Popconfirm>
+              )}
+              <Popconfirm
+                title="Permanently Delete Volunteer"
+                description="This action cannot be undone. The volunteer and all their data will be permanently removed."
+                onConfirm={handleHardDelete}
+                okText="Delete Permanently"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: actionLoading }}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={actionLoading}>
+                  Hard Delete
+                </Button>
+              </Popconfirm>
+            </Space>
+          )}
+        </div>
         <Descriptions bordered column={2}>
           <Descriptions.Item label="ID">{volunteer.id}</Descriptions.Item>
           <Descriptions.Item label="Status">

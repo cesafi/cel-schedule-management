@@ -9,7 +9,9 @@ import {
   Space, 
   Segmented, 
   Empty,
-  Spin
+  Spin,
+  InputNumber,
+  Input
 } from 'antd';
 import { 
   CalendarOutlined, 
@@ -27,6 +29,11 @@ import { useEvents, useVolunteers, useDepartments } from '../hooks';
 
 const { Title, Paragraph } = Typography;
 
+const DEFAULT_DAYS_BEFORE = 10;
+const DEFAULT_DAYS_AFTER = 10;
+const MIN_DAYS = 0;
+const MAX_DAYS = 365;
+
 type ViewMode = 'My Events' | 'All Events';
 
 export const HomePage: React.FC = () => {
@@ -34,28 +41,40 @@ export const HomePage: React.FC = () => {
   const { user, isAuthenticated, isAdmin, isDeptHead, userDepartments } = useAuth();
   
   const [viewMode, setViewMode] = useState<ViewMode>('My Events');
-  
+  const [daysBefore, setDaysBefore] = useState<number>(10);
+  const [daysAfter, setDaysAfter] = useState<number>(10);
+  const [volunteerSearch, setVolunteerSearch] = useState('');
+
   // Fetch data using React Query hooks
   const { data: allEvents = [], isLoading: eventsLoading } = useEvents();
-  const { data: volunteers = [], isLoading: volunteersLoading } = useVolunteers(true);
-  const { data: departments = [], isLoading: departmentsLoading } = useDepartments(true);
+  const { data: volunteers = [], isLoading: volunteersLoading } = useVolunteers(isAdmin, isAuthenticated);
+  const { data: departments = [], isLoading: departmentsLoading } = useDepartments(isAdmin, isAuthenticated);
 
   const loading = eventsLoading || volunteersLoading || departmentsLoading;
 
-  // Filter events within date range (2 days past to 7 days future) - memoized
+  // Filter events within the user-configurable date range - memoized
   const relevantEvents = useMemo(() => {
     const now = new Date();
-    const twoDaysAgo = subDays(now, 2);
-    const oneWeekFromNow = addDays(now, 7);
+    const rangeStart = subDays(now, daysBefore);
+    const rangeEnd = addDays(now, daysAfter);
 
     return allEvents.filter(event => {
       if (event.isDisabled) return false;
       const eventDate = parseISO(event.timeAndDate);
-      return isAfter(eventDate, twoDaysAgo) && isBefore(eventDate, oneWeekFromNow);
-    }).sort((a, b) => 
-      new Date(a.timeAndDate).getTime() - new Date(b.timeAndDate).getTime()
-    );
-  }, [allEvents]);
+      return isAfter(eventDate, rangeStart) && isBefore(eventDate, rangeEnd);
+    }).sort((a, b) => {
+      const now = new Date();
+      const aDate = new Date(a.timeAndDate);
+      const bDate = new Date(b.timeAndDate);
+      const aFuture = aDate >= now;
+      const bFuture = bDate >= now;
+      // Future events come first, sorted ascending (nearest first)
+      if (aFuture && bFuture) return aDate.getTime() - bDate.getTime();
+      // Past events after future, sorted descending (most recent past first)
+      if (!aFuture && !bFuture) return bDate.getTime() - aDate.getTime();
+      return aFuture ? -1 : 1;
+    });
+  }, [allEvents, daysBefore, daysAfter]);
 
   // Calculate statistics - memoized
   const stats = useMemo(() => {
@@ -81,7 +100,7 @@ export const HomePage: React.FC = () => {
 
   // Filter events based on view mode - memoized
   const filteredEvents = useMemo(() => {
-    if (viewMode === 'All Events') {
+    if (!isAuthenticated || viewMode === 'All Events') {
       return relevantEvents;
     }
 
@@ -103,7 +122,25 @@ export const HomePage: React.FC = () => {
 
       return isAssignedVolunteer || isDeptHeadOfEvent;
     });
-  }, [viewMode, relevantEvents, user, isDeptHead, userDepartments]);
+  }, [viewMode, relevantEvents, isAuthenticated, user, isDeptHead, userDepartments]);
+
+  // Build volunteer id -> name map for search
+  const volunteerNameMap = useMemo(() => {
+    return new Map(volunteers.map(v => [v.id, v.name.toLowerCase()]));
+  }, [volunteers]);
+
+  // Apply volunteer name search on top of filteredEvents (timeline only)
+  const searchedTimelineEvents = useMemo(() => {
+    if (!volunteerSearch.trim()) return filteredEvents;
+    const term = volunteerSearch.trim().toLowerCase();
+    return filteredEvents.filter(event => {
+      const allVolunteerIds = [
+        ...(event.scheduledVolunteers || []),
+        ...(event.voluntaryVolunteers || []),
+      ];
+      return allVolunteerIds.some(vid => volunteerNameMap.get(vid)?.includes(term));
+    });
+  }, [filteredEvents, volunteerSearch, volunteerNameMap]);
 
   const handleQuickCheckIn = (eventId: string) => {
     navigate(`/events/${eventId}`);
@@ -237,7 +274,7 @@ export const HomePage: React.FC = () => {
       {/* Today's Events Section */}
       {todaysEvents.length > 0 && (
         <Card 
-          style={{ marginTop: 24, backgroundColor: '#f6ffed', borderColor: '#52c41a' }} 
+          style={{ marginTop: 24, backgroundColor: 'rgba(82, 196, 26, 0.08)', borderColor: 'rgba(82, 196, 26, 0.4)' }} 
           title={
             <Space>
               <ClockCircleOutlined style={{ color: '#52c41a' }} />
@@ -263,13 +300,32 @@ export const HomePage: React.FC = () => {
       <Card 
         style={{ marginTop: 24 }}
         title={
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-            <Space>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <Space wrap>
               <CalendarOutlined />
               <span>Event Timeline</span>
-              <Paragraph type="secondary" style={{ margin: 0, fontSize: '0.9em' }}>
-                (2 days past to 1 week ahead)
-              </Paragraph>
+              <Space size="small">
+                <InputNumber
+                  min={MIN_DAYS}
+                  max={MAX_DAYS}
+                  value={daysBefore}
+                  onChange={(val) => setDaysBefore(val ?? DEFAULT_DAYS_BEFORE)}
+                  addonBefore="Past"
+                  addonAfter="days"
+                  size="small"
+                  style={{ width: 130 }}
+                />
+                <InputNumber
+                  min={MIN_DAYS}
+                  max={MAX_DAYS}
+                  value={daysAfter}
+                  onChange={(val) => setDaysAfter(val ?? DEFAULT_DAYS_AFTER)}
+                  addonBefore="Future"
+                  addonAfter="days"
+                  size="small"
+                  style={{ width: 130 }}
+                />
+              </Space>
             </Space>
             {isAuthenticated && (
               <Segmented
@@ -281,16 +337,25 @@ export const HomePage: React.FC = () => {
           </div>
         }
       >
-        {filteredEvents.length === 0 ? (
+        <Input.Search
+          placeholder="Search by volunteer name..."
+          allowClear
+          value={volunteerSearch}
+          onChange={(e) => setVolunteerSearch(e.target.value)}
+          style={{ marginBottom: 16, maxWidth: 320 }}
+        />
+        {searchedTimelineEvents.length === 0 ? (
           <Empty 
             description={
-              viewMode === 'My Events' 
-                ? "No events assigned to you in this time range" 
-                : "No events scheduled in this time range"
+              volunteerSearch.trim()
+                ? `No events found with a volunteer matching "${volunteerSearch}"`
+                : viewMode === 'My Events'
+                  ? "No events assigned to you in this time range"
+                  : "No events scheduled in this time range"
             }
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           >
-            {isAdmin && (
+            {isAdmin && !volunteerSearch.trim() && (
               <Button type="primary" onClick={() => navigate('/schedules')}>
                 Create New Event
               </Button>
@@ -298,7 +363,7 @@ export const HomePage: React.FC = () => {
           </Empty>
         ) : (
           <Row gutter={[16, 16]}>
-            {filteredEvents.map(event => (
+            {searchedTimelineEvents.map(event => (
               <Col xs={24} sm={12} lg={8} key={event.id}>
                 <EventCard
                   event={event}

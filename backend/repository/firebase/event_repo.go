@@ -104,7 +104,7 @@ func (r *eventScheduleRepo) AddVolunteerStatus(ctx context.Context, eventID stri
 
 	// Append the new status
 	event.Statuses = append(event.Statuses, *status)
-	event.LastUpdated = time.Now()
+	event.LastUpdated = time.Now().UTC()
 	// should have checker for the volunteered volunteers
 	event.ScheduledVolunteers = append(event.ScheduledVolunteers, status.VolunteerID)
 	// Update the event
@@ -145,7 +145,7 @@ func (r *eventScheduleRepo) UpdateVolunteerStatus(ctx context.Context, eventID s
 		return fmt.Errorf("volunteer status not found for volunteer ID: %s", volunteerID)
 	}
 
-	event.LastUpdated = time.Now()
+	event.LastUpdated = time.Now().UTC()
 
 	// Update the event
 	if err := r.UpdateEvent(ctx, event); err != nil {
@@ -271,7 +271,7 @@ func (r *eventScheduleRepo) AddDepartmentToEvent(ctx context.Context, eventID st
 
 	// Add the department to assigned groups
 	event.AssignedGroups = append(event.AssignedGroups, dept_id)
-	event.LastUpdated = time.Now()
+	event.LastUpdated = time.Now().UTC()
 
 	// Update the event
 	if err := r.UpdateEvent(ctx, event); err != nil {
@@ -305,7 +305,7 @@ func (r *eventScheduleRepo) RemoveDepartmentFromEvent(ctx context.Context, event
 	}
 
 	event.AssignedGroups = newAssignedGroups
-	event.LastUpdated = time.Now()
+	event.LastUpdated = time.Now().UTC()
 
 	// Update the event
 	if err := r.UpdateEvent(ctx, event); err != nil {
@@ -361,7 +361,7 @@ func (r *eventScheduleRepo) RemoveVolunteerFromEvent(ctx context.Context, eventI
 	event.Statuses = newStatuses
 	event.ScheduledVolunteers = newScheduledVolunteers
 	event.VoluntaryVolunteers = newVoluntaryVolunteers
-	event.LastUpdated = time.Now()
+	event.LastUpdated = time.Now().UTC()
 
 	// Update the event
 	if err := r.UpdateEvent(ctx, event); err != nil {

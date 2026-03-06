@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col } from 'antd';
-import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Typography, Card, Descriptions, Table, Button, Tag, Spin, message, Popconfirm, Tabs, Row, Col, Space } from 'antd';
+import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined, CalendarOutlined, TeamOutlined, LineChartOutlined, CheckCircleOutlined, FileTextOutlined, RollbackOutlined, EditOutlined } from '@ant-design/icons';
 import { departmentsApi, volunteersApi } from '../../api';
-import { Department, StatusHistoryItem, Volunteer, MembershipType, AddMemberDTO, EventSchedule } from '../../types';
+import { Department, Volunteer, MembershipType, AddMemberDTO, DepartmentUpdateDTO, EventSchedule } from '../../types';
 import { format } from 'date-fns';
 import { AddMemberModal } from './modals/AddMemberModal';
+import { DepartmentEditModal } from './modals/DepartmentEditModal';
 import { useAuth } from '../auth';
 import { StatsCard, AttendancePieChart, AttendanceTrendChart, DateRangePicker, LogsTable } from '../../components';
 import { useDepartmentAnalytics, useUpcomingEvents, useEntityLogs } from '../../hooks';
@@ -17,10 +18,12 @@ export const DepartmentDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, isHeadOfDepartment } = useAuth();
   const [department, setDepartment] = useState<Department | null>(null);
-  const [history, setHistory] = useState<StatusHistoryItem[]>([]);
+  const [history, setHistory] = useState<EventSchedule[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [logPage, setLogPage] = useState(1);
@@ -129,6 +132,49 @@ export const DepartmentDetailPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to remove member:', err);
       message.error('Failed to remove member');
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await departmentsApi.restore(id);
+      message.success('Department restored successfully');
+      fetchData();
+    } catch (err) {
+      console.error('Failed to restore department:', err);
+      message.error('Failed to restore department');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditSubmit = async (values: DepartmentUpdateDTO) => {
+    if (!id) return;
+    try {
+      await departmentsApi.update(id, values);
+      message.success('Department updated successfully');
+      setEditModalOpen(false);
+      fetchData();
+    } catch (err) {
+      console.error('Failed to update department:', err);
+      message.error('Failed to update department');
+      throw err;
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!id) return;
+    setActionLoading(true);
+    try {
+      await departmentsApi.hardDelete(id);
+      message.success('Department permanently deleted');
+      navigate('/departments');
+    } catch (err) {
+      console.error('Failed to permanently delete department:', err);
+      message.error('Failed to permanently delete department');
+      setActionLoading(false);
     }
   };
 
@@ -241,8 +287,8 @@ export const DepartmentDetailPage: React.FC = () => {
   const historyColumns = [
     {
       title: 'Event',
-      dataIndex: 'eventName',
-      key: 'eventName',
+      dataIndex: 'name',
+      key: 'name',
     },
     {
       title: 'Date',
@@ -251,10 +297,19 @@ export const DepartmentDetailPage: React.FC = () => {
       render: (date: string) => format(new Date(date), 'MMM dd, yyyy HH:mm'),
     },
     {
+      title: 'Check-ins',
+      key: 'checkIns',
+      render: (_: unknown, record: EventSchedule) => {
+        const deptMemberIds = department.volunteerMembers?.map(m => m.volunteerID) || [];
+        const checkedIn = (record.statuses || []).filter(s => deptMemberIds.includes(s.volunteerID)).length;
+        return `${checkedIn} / ${deptMemberIds.length}`;
+      },
+    },
+    {
       title: 'Actions',
       key: 'actions',
-      render: (_: unknown, record: StatusHistoryItem) => (
-        <Button type="link" onClick={() => navigate(`/events/${record.eventId}`)}>
+      render: (_: unknown, record: EventSchedule) => (
+        <Button type="link" onClick={() => navigate(`/events/${record.id}`)}>
           View Event
         </Button>
       ),
@@ -428,7 +483,7 @@ export const DepartmentDetailPage: React.FC = () => {
             style={{ marginTop: 16 }}
             columns={historyColumns}
             dataSource={filteredHistory}
-            rowKey="eventId"
+            rowKey="id"
             pagination={{ pageSize: 10 }}
           />
         </Card>
@@ -473,7 +528,42 @@ export const DepartmentDetailPage: React.FC = () => {
       </Button>
 
       <Card>
-        <Title level={2}>{department.departmentName}</Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Title level={2} style={{ margin: 0 }}>{department.departmentName}</Title>
+          {isAdmin && (
+            <Space wrap>
+              <Button icon={<EditOutlined />} onClick={() => setEditModalOpen(true)}>
+                Edit Department
+              </Button>
+              {department.isDisabled && (
+                <Popconfirm
+                  title="Restore Department"
+                  description="Are you sure you want to restore this department? It will become active again."
+                  onConfirm={handleRestore}
+                  okText="Restore"
+                  cancelText="Cancel"
+                  okButtonProps={{ loading: actionLoading }}
+                >
+                  <Button icon={<RollbackOutlined />} type="primary">
+                    Restore
+                  </Button>
+                </Popconfirm>
+              )}
+              <Popconfirm
+                title="Permanently Delete Department"
+                description="This action cannot be undone. The department and all its data will be permanently removed."
+                onConfirm={handleHardDelete}
+                okText="Delete Permanently"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: actionLoading }}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={actionLoading}>
+                  Hard Delete
+                </Button>
+              </Popconfirm>
+            </Space>
+          )}
+        </div>
         <Descriptions bordered column={2}>
           <Descriptions.Item label="ID">{department.id}</Descriptions.Item>
           <Descriptions.Item label="Department Head">
@@ -513,6 +603,13 @@ export const DepartmentDetailPage: React.FC = () => {
         availableVolunteers={availableVolunteers}
         onCancel={() => setModalOpen(false)}
         onSubmit={handleAddMember}
+      />
+
+      <DepartmentEditModal
+        open={editModalOpen}
+        department={department}
+        onCancel={() => setEditModalOpen(false)}
+        onSubmit={handleEditSubmit}
       />
     </div>
   );

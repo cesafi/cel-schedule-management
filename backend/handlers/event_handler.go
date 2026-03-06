@@ -49,13 +49,13 @@ func (h *EventHandler) Create(c *gin.Context) {
 	event := models.EventSchedule{
 		Name:                input.Name,
 		Description:         input.Description,
-		TimeAndDate:         input.TimeAndDate,
+		TimeAndDate:         input.TimeAndDate.UTC(),
 		ScheduledVolunteers: input.ScheduledVolunteers,
 		VoluntaryVolunteers: input.VoluntaryVolunteers,
 		AssignedGroups:      input.AssignedGroups,
 		IsDisabled:          false,
-		CreateAt:            time.Now(),
-		LastUpdated:         time.Now(),
+		CreateAt:            time.Now().UTC(),
+		LastUpdated:         time.Now().UTC(),
 	}
 
 	// Map location from DTO to model
@@ -120,10 +120,10 @@ func (h *EventHandler) Update(c *gin.Context) {
 		changes[sub_model.META_NEW_DESCRIPTION] = *updateInput.Description
 		existingEvent.Description = *updateInput.Description
 	}
-	if updateInput.TimeAndDate != nil && !updateInput.TimeAndDate.Equal(existingEvent.TimeAndDate) {
+	if updateInput.TimeAndDate != nil && !updateInput.TimeAndDate.UTC().Equal(existingEvent.TimeAndDate) {
 		changes[sub_model.META_OLD_DATE_TIME] = existingEvent.TimeAndDate
-		changes[sub_model.META_NEW_DATE_TIME] = *updateInput.TimeAndDate
-		existingEvent.TimeAndDate = *updateInput.TimeAndDate
+		changes[sub_model.META_NEW_DATE_TIME] = updateInput.TimeAndDate.UTC()
+		existingEvent.TimeAndDate = updateInput.TimeAndDate.UTC()
 	}
 	// Map location from DTO to model if provided
 	if updateInput.Location != nil {
@@ -154,7 +154,7 @@ func (h *EventHandler) Update(c *gin.Context) {
 		existingEvent.IsDisabled = *updateInput.IsDisabled
 	}
 
-	existingEvent.LastUpdated = time.Now()
+	existingEvent.LastUpdated = time.Now().UTC()
 
 	if err := h.db.EventSchedules().UpdateEvent(c.Request.Context(), existingEvent); err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
@@ -188,7 +188,7 @@ func (h *EventHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	existingEvent.LastUpdated = time.Now()
+	existingEvent.LastUpdated = time.Now().UTC()
 	existingEvent.IsDisabled = true
 
 	if err := h.db.EventSchedules().UpdateEvent(c.Request.Context(), existingEvent); err != nil {
@@ -218,7 +218,7 @@ func (h *EventHandler) AddVolunteerStatus(c *gin.Context) {
 
 	status := sub_model.ScheduleStatus{
 		VolunteerID: input.VolunteerID,
-		AssignedAt:  time.Now(),
+		AssignedAt:  time.Now().UTC(),
 	}
 
 	if err := h.db.EventSchedules().AddVolunteerStatus(c.Request.Context(), eventID, &status); err != nil {
@@ -306,7 +306,9 @@ func (h *EventHandler) TimeOutVolunteer(c *gin.Context) {
 		return
 	}
 	if input.TimeOut.IsZero() {
-		input.TimeOut = time.Now()
+		input.TimeOut = time.Now().UTC()
+	} else {
+		input.TimeOut = input.TimeOut.UTC()
 	}
 	status := sub_model.ScheduleStatus{
 		TimeOut:     input.TimeOut,
@@ -347,7 +349,9 @@ func (h *EventHandler) TimeInVolunteer(c *gin.Context) {
 		return
 	}
 	if input.TimeIn.IsZero() {
-		input.TimeIn = time.Now()
+		input.TimeIn = time.Now().UTC()
+	} else {
+		input.TimeIn = input.TimeIn.UTC()
 	}
 	status := sub_model.ScheduleStatus{
 		TimeIn:         input.TimeIn,

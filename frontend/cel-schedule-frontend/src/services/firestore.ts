@@ -1,196 +1,731 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  query, 
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
   where,
   orderBy,
   Timestamp,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove,
+  writeBatch,
+  DocumentReference,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Volunteer, EventSchedule, Department } from '../types';
+import type { UserProfile } from '../types/authUser';
+import { clientWriteLog } from '../utils/clientLog';
+import type {
+  VolunteerCreateDTO,
+  VolunteerUpdateDTO,
+} from '../types/volunteer';
+import type {
+  DepartmentCreateDTO,
+  DepartmentUpdateDTO,
+  AddMemberDTO,
+  UpdateMemberDTO,
+} from '../types/department';
+import type {
+  EventCreateDTO,
+  EventUpdateDTO,
+  AddStatusDTO,
+  UpdateStatusDTO,
+  TimeInDTO,
+  TimeOutDTO,
+} from '../types/event';
 
-// Collection names - must match backend
+// ---------------------------------------------------------------------------
+// Collection names — must match Firestore exactly
+// ---------------------------------------------------------------------------
 const COLLECTIONS = {
   volunteers: 'volunteers',
   events: 'events',
   departments: 'departments',
-  authUsers: 'auth_users',
+  users: 'users',          // replaces auth_users — stores UserProfile per UID
   logs: 'logs',
 } as const;
 
-// Helper to convert Firestore data: PascalCase to camelCase + Timestamps to ISO strings
-const convertFirestoreData = (data: any): any => {
+// ---------------------------------------------------------------------------
+// Helper: convert Firestore doc data (PascalCase keys → camelCase, Timestamps → ISO)
+// ---------------------------------------------------------------------------
+const convertFirestoreData = (data: unknown): unknown => {
   if (data instanceof Timestamp) {
     return data.toDate().toISOString();
   }
-  
   if (Array.isArray(data)) {
-    return data.map(item => convertFirestoreData(item));
+    return data.map((item) => convertFirestoreData(item));
   }
-  
   if (data !== null && typeof data === 'object') {
-    const converted: any = {};
-    Object.keys(data).forEach(key => {
-      // Convert PascalCase to camelCase
+    const converted: Record<string, unknown> = {};
+    Object.keys(data as object).forEach((key) => {
       const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
-      converted[camelKey] = convertFirestoreData(data[key]);
+      converted[camelKey] = convertFirestoreData((data as Record<string, unknown>)[key]);
     });
     return converted;
   }
-  
   return data;
 };
 
+// ---------------------------------------------------------------------------
+// Helper: build a Firestore timestamp-aware update payload
+// ---------------------------------------------------------------------------
+const withTimestamps = <T extends object>(data: T) => ({
+  ...data,
+  LastUpdated: serverTimestamp(),
+});
+
+const withCreationTimestamps = <T extends object>(data: T) => ({
+  ...data,
+  CreatedAt: serverTimestamp(),
+  LastUpdated: serverTimestamp(),
+  IsDisabled: false,
+});
+
+// ---------------------------------------------------------------------------
+// firestoreService
+// ---------------------------------------------------------------------------
 export const firestoreService = {
+
+  // ==========================================================================
+  // Users (replaces auth_users — stores UserProfile per Firebase UID)
+  // ==========================================================================
+  users: {
+    async getAll(): Promise<UserProfile[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.users));
+      return snapshot.docs.map((d) => ({
+        uid: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<UserProfile, 'uid'>),
+      })) as UserProfile[];
+    },
+
+    async getById(uid: string): Promise<UserProfile> {
+      const docRef = doc(db, COLLECTIONS.users, uid);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) throw new Error(`User profile not found: ${uid}`);
+      return {
+        uid: snap.id,
+        ...(convertFirestoreData(snap.data()) as Omit<UserProfile, 'uid'>),
+      } as UserProfile;
+    },
+
+    async create(uid: string, profile: Omit<UserProfile, 'uid' | 'createdAt' | 'lastUpdated'>): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.users, uid);
+      await setDoc(docRef, withCreationTimestamps(profile));
+    },
+
+    async update(uid: string, data: Partial<Omit<UserProfile, 'uid'>>): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.users, uid);
+      await updateDoc(docRef, withTimestamps(data));
+    },
+  },
+
+  // ==========================================================================
   // Volunteers
+  // ==========================================================================
   volunteers: {
     async getAll(): Promise<Volunteer[]> {
-      try {
-        const q = query(
-          collection(db, COLLECTIONS.volunteers),
-          where('IsDisabled', '==', false)
-        );
-        const snapshot = await getDocs(q);
-        const volunteers = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...convertFirestoreData(doc.data())
-        })) as Volunteer[];
-        // Sort in-memory until indexes are ready
-        return volunteers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      } catch (error) {
-        console.error('Error fetching volunteers from Firestore:', error);
-        throw error;
-      }
+      const q = query(
+        collection(db, COLLECTIONS.volunteers),
+        where('IsDisabled', '==', false),
+      );
+      const snapshot = await getDocs(q);
+      const volunteers = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<Volunteer, 'id'>),
+      })) as Volunteer[];
+      return volunteers.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    },
+
+    /** Fetch all volunteers including soft-deleted ones (admin only) */
+    async getAllIncludingDisabled(): Promise<Volunteer[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.volunteers));
+      const volunteers = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<Volunteer, 'id'>),
+      })) as Volunteer[];
+      return volunteers.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
     },
 
     async getById(id: string): Promise<Volunteer> {
-      try {
-        const docRef = doc(db, COLLECTIONS.volunteers, id);
-        const docSnap = await getDoc(docRef);
-        
-        if (!docSnap.exists()) {
-          throw new Error('Volunteer not found');
-        }
+      const docRef = doc(db, COLLECTIONS.volunteers, id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) throw new Error('Volunteer not found');
+      return { id: snap.id, ...(convertFirestoreData(snap.data()) as Omit<Volunteer, 'id'>) } as Volunteer;
+    },
 
-        return {
-          id: docSnap.id,
-          ...convertFirestoreData(docSnap.data())
-        } as Volunteer;
-      } catch (error) {
-        console.error(`Error fetching volunteer ${id} from Firestore:`, error);
-        throw error;
-      }
+    async create(data: VolunteerCreateDTO): Promise<Volunteer> {
+      const ref: DocumentReference = await addDoc(
+        collection(db, COLLECTIONS.volunteers),
+        withCreationTimestamps({ Name: data.name }),
+      );
+      const volunteer = await firestoreService.volunteers.getById(ref.id);
+      await clientWriteLog({ type: 'VOLUNTEER_CREATED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: volunteer.id, volunteerName: volunteer.name } });
+      return volunteer;
+    },
+
+    async update(id: string, data: VolunteerUpdateDTO): Promise<Volunteer> {
+      const docRef = doc(db, COLLECTIONS.volunteers, id);
+      const payload: Record<string, unknown> = {};
+      if (data.name !== undefined) payload['Name'] = data.name;
+      if (data.isDisabled !== undefined) payload['IsDisabled'] = data.isDisabled;
+      await updateDoc(docRef, withTimestamps(payload));
+      const volunteer = await firestoreService.volunteers.getById(id);
+      const logType = data.isDisabled === true
+        ? 'VOLUNTEER_DISABLED'
+        : data.isDisabled === false
+          ? 'VOLUNTEER_ENABLED'
+          : 'VOLUNTEER_UPDATED';
+      await clientWriteLog({ type: logType, category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id, volunteerName: volunteer.name } });
+      return volunteer;
+    },
+
+    /** Soft-delete — sets IsDisabled = true */
+    async delete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.volunteers, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+      await clientWriteLog({ type: 'VOLUNTEER_DISABLED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id } });
+    },
+
+    /** Restore — sets IsDisabled = false */
+    async restore(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.volunteers, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+      await clientWriteLog({ type: 'VOLUNTEER_ENABLED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id } });
+    },
+
+    /** Hard delete — permanently removes the document from Firestore */
+    async hardDelete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.volunteers, id);
+      await deleteDoc(docRef);
+      await clientWriteLog({ type: 'VOLUNTEER_DELETED', category: 'volunteer_management', severity: 'INFO', metadata: { volunteerId: id } });
     },
   },
 
-  // Events
-  events: {
-    async getAll(): Promise<EventSchedule[]> {
-      try {
-        const q = query(
-          collection(db, COLLECTIONS.events),
-          where('IsDisabled', '==', false)
-        );
-        const snapshot = await getDocs(q);
-        const events = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...convertFirestoreData(doc.data())
-        })) as EventSchedule[];
-        // Sort in-memory until indexes are ready
-        return events.sort((a, b) => new Date(b.timeAndDate || 0).getTime() - new Date(a.timeAndDate || 0).getTime());
-      } catch (error) {
-        console.error('Error fetching events from Firestore:', error);
-        throw error;
-      }
-    },
-
-    async getById(id: string): Promise<EventSchedule> {
-      try {
-        const docRef = doc(db, COLLECTIONS.events, id);
-        const docSnap = await getDoc(docRef);
-        
-        if (!docSnap.exists()) {
-          throw new Error('Event not found');
-        }
-
-        return {
-          id: docSnap.id,
-          ...convertFirestoreData(docSnap.data())
-        } as EventSchedule;
-      } catch (error) {
-        console.error(`Error fetching event ${id} from Firestore:`, error);
-        throw error;
-      }
-    },
-  },
-
+  // ==========================================================================
   // Departments
+  // ==========================================================================
   departments: {
     async getAll(): Promise<Department[]> {
-      try {
-        console.log('[Firestore] Fetching all departments from collection:', COLLECTIONS.departments);
-        
-        const q = query(
-          collection(db, COLLECTIONS.departments),
-          where('IsDisabled', '==', false)
-        );
-        const snapshot = await getDocs(q);
-        
-        console.log('[Firestore] Found', snapshot.docs.length, 'departments');
-        
-        const departments = snapshot.docs.map(doc => {
-          const dept = {
-            id: doc.id,
-            ...convertFirestoreData(doc.data())
-          } as Department;
-          console.log('[Firestore] Department ID:', doc.id, 'Name:', dept.departmentName);
-          return dept;
-        });
-        
-        // Sort in-memory until indexes are ready
-        return departments.sort((a, b) => (a.departmentName || '').localeCompare(b.departmentName || ''));
-      } catch (error) {
-        console.error('Error fetching departments from Firestore:', error);
-        throw error;
-      }
+      const q = query(
+        collection(db, COLLECTIONS.departments),
+        where('IsDisabled', '==', false),
+      );
+      const snapshot = await getDocs(q);
+      const departments = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<Department, 'id'>),
+      })) as Department[];
+      return departments.sort((a, b) =>
+        (a.departmentName ?? '').localeCompare(b.departmentName ?? ''),
+      );
+    },
+
+    /** Fetch all departments including soft-deleted ones (admin only) */
+    async getAllIncludingDisabled(): Promise<Department[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.departments));
+      const departments = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<Department, 'id'>),
+      })) as Department[];
+      return departments.sort((a, b) =>
+        (a.departmentName ?? '').localeCompare(b.departmentName ?? ''),
+      );
     },
 
     async getById(id: string): Promise<Department> {
-      try {
-        console.log('[Firestore] Fetching department with ID:', id);
-        console.log('[Firestore] Collection path:', COLLECTIONS.departments);
-        
-        const docRef = doc(db, COLLECTIONS.departments, id);
-        const docSnap = await getDoc(docRef);
-        
-        console.log('[Firestore] Document exists:', docSnap.exists());
-        
-        if (!docSnap.exists()) {
-          console.error('[Firestore] Department document not found. ID:', id);
-          throw new Error(`Department not found with ID: ${id}`);
-        }
+      const docRef = doc(db, COLLECTIONS.departments, id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) throw new Error(`Department not found: ${id}`);
+      return {
+        id: snap.id,
+        ...(convertFirestoreData(snap.data()) as Omit<Department, 'id'>),
+      } as Department;
+    },
 
-        const rawData = docSnap.data();
-        console.log('[Firestore] Raw document data:', rawData);
-        
-        const converted = {
-          id: docSnap.id,
-          ...convertFirestoreData(rawData)
-        } as Department;
-        
-        console.log('[Firestore] Converted department:', converted);
-        
-        return converted;
-      } catch (error) {
-        console.error(`[Firestore] Error fetching department ${id}:`, error);
-        if (error instanceof Error) {
-          console.error('[Firestore] Error message:', error.message);
-          console.error('[Firestore] Error stack:', error.stack);
-        }
-        throw error;
+    async create(data: DepartmentCreateDTO): Promise<Department> {
+      const now = new Date().toISOString();
+      const ref: DocumentReference = await addDoc(
+        collection(db, COLLECTIONS.departments),
+        withCreationTimestamps({
+          DepartmentName: data.departmentName,
+          VolunteerMembers: [
+            {
+              VolunteerID: data.initialHeadId,
+              JoinedDate: now,
+              MembershipType: 'HEAD',
+              LastUpdated: now,
+            },
+          ],
+        }),
+      );
+      const dept = await firestoreService.departments.getById(ref.id);
+      await clientWriteLog({ type: 'DEPARTMENT_CREATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: dept.id, departmentName: dept.departmentName } });
+      return dept;
+    },
+
+    async update(id: string, data: DepartmentUpdateDTO): Promise<Department> {
+      const docRef = doc(db, COLLECTIONS.departments, id);
+      const payload: Record<string, unknown> = {};
+      if (data.name !== undefined) payload['DepartmentName'] = data.name;
+      if (data.isDisabled !== undefined) payload['IsDisabled'] = data.isDisabled;
+      await updateDoc(docRef, withTimestamps(payload));
+      const dept = await firestoreService.departments.getById(id);
+      await clientWriteLog({ type: 'DEPARTMENT_UPDATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id, departmentName: dept.departmentName } });
+      return dept;
+    },
+
+    /** Soft-delete */
+    async delete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.departments, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+      await clientWriteLog({ type: 'DEPARTMENT_DELETED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id } });
+    },
+
+    /** Restore — sets IsDisabled = false */
+    async restore(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.departments, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+      await clientWriteLog({ type: 'DEPARTMENT_UPDATED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id, changeType: 'restored' } });
+    },
+
+    /** Hard delete — permanently removes the document from Firestore */
+    async hardDelete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.departments, id);
+      await deleteDoc(docRef);
+      await clientWriteLog({ type: 'DEPARTMENT_DELETED', category: 'department_management', severity: 'INFO', metadata: { departmentId: id } });
+    },
+
+    async addMember(deptId: string, data: AddMemberDTO): Promise<Department> {
+      const docRef = doc(db, COLLECTIONS.departments, deptId);
+      const now = new Date().toISOString();
+      await updateDoc(docRef, {
+        VolunteerMembers: arrayUnion({
+          VolunteerID: data.volunteerId,
+          JoinedDate: now,
+          MembershipType: data.membershipType,
+          LastUpdated: now,
+        }),
+        LastUpdated: serverTimestamp(),
+      });
+      const dept = await firestoreService.departments.getById(deptId);
+      await clientWriteLog({ type: 'DEPARTMENT_MEMBER_ADDED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: dept.departmentName, volunteerId: data.volunteerId, membershipType: data.membershipType } });
+      return dept;
+    },
+
+    async updateMember(
+      deptId: string,
+      volunteerId: string,
+      data: UpdateMemberDTO,
+    ): Promise<Department> {
+      const dept = await firestoreService.departments.getById(deptId);
+      const now = new Date().toISOString();
+      const updatedMembers = (dept.volunteerMembers ?? []).map((m) =>
+        m.volunteerID === volunteerId
+          ? { ...m, membershipType: data.membershipType, lastUpdated: now }
+          : m,
+      );
+      // Re-map to PascalCase for Firestore
+      const docRef = doc(db, COLLECTIONS.departments, deptId);
+      await updateDoc(docRef, {
+        VolunteerMembers: updatedMembers.map((m) => ({
+          VolunteerID: m.volunteerID,
+          JoinedDate: m.joinedDate,
+          MembershipType: m.membershipType,
+          LastUpdated: m.lastUpdated,
+        })),
+        LastUpdated: serverTimestamp(),
+      });
+      await clientWriteLog({ type: 'DEPARTMENT_ROLE_CHANGED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: dept.departmentName, volunteerId, newRole: data.membershipType } });
+      return firestoreService.departments.getById(deptId);
+    },
+
+    async removeMember(deptId: string, volunteerId: string): Promise<void> {
+      const dept = await firestoreService.departments.getById(deptId);
+      const memberToRemove = (dept.volunteerMembers ?? []).find(
+        (m) => m.volunteerID === volunteerId,
+      );
+      if (!memberToRemove) return;
+      const docRef = doc(db, COLLECTIONS.departments, deptId);
+      // arrayRemove requires exact match — use full object with original casing from Firestore
+      const snap = await getDoc(docRef);
+      const raw = snap.data()?.VolunteerMembers ?? [];
+      const toRemove = raw.find(
+        (m: Record<string, unknown>) => m['VolunteerID'] === volunteerId,
+      );
+      if (toRemove) {
+        await updateDoc(docRef, {
+          VolunteerMembers: arrayRemove(toRemove),
+          LastUpdated: serverTimestamp(),
+        });
+        await clientWriteLog({ type: 'DEPARTMENT_MEMBER_REMOVED', category: 'department_management', severity: 'INFO', metadata: { departmentId: deptId, departmentName: dept.departmentName, volunteerId } });
       }
     },
   },
+
+  // ==========================================================================
+  // Events
+  // ==========================================================================
+  events: {
+    async getAll(): Promise<EventSchedule[]> {
+      const q = query(
+        collection(db, COLLECTIONS.events),
+        where('IsDisabled', '==', false),
+      );
+      const snapshot = await getDocs(q);
+      const events = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<EventSchedule, 'id'>),
+      })) as EventSchedule[];
+      return events.sort(
+        (a, b) =>
+          new Date(b.timeAndDate ?? 0).getTime() - new Date(a.timeAndDate ?? 0).getTime(),
+      );
+    },
+
+    /** Fetch all events including soft-deleted ones (admin only) */
+    async getAllIncludingDisabled(): Promise<EventSchedule[]> {
+      const snapshot = await getDocs(collection(db, COLLECTIONS.events));
+      const events = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as Omit<EventSchedule, 'id'>),
+      })) as EventSchedule[];
+      return events.sort(
+        (a, b) =>
+          new Date(b.timeAndDate ?? 0).getTime() - new Date(a.timeAndDate ?? 0).getTime(),
+      );
+    },
+
+    async getById(id: string): Promise<EventSchedule> {
+      const docRef = doc(db, COLLECTIONS.events, id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) throw new Error('Event not found');
+      return { id: snap.id, ...(convertFirestoreData(snap.data()) as Omit<EventSchedule, 'id'>) } as EventSchedule;
+    },
+
+    async create(data: EventCreateDTO): Promise<EventSchedule> {
+      const ref: DocumentReference = await addDoc(
+        collection(db, COLLECTIONS.events),
+        withCreationTimestamps({
+          Name: data.name,
+          Description: data.description,
+          TimeAndDate: data.timeAndDate,
+          Location: data.location ?? null,
+          ScheduledVolunteers: data.scheduledVolunteers ?? [],
+          VoluntaryVolunteers: data.voluntaryVolunteers ?? [],
+          AssignedGroups: data.assignedGroups ?? [],
+          Statuses: [],
+        }),
+      );
+      const event = await firestoreService.events.getById(ref.id);
+      await clientWriteLog({ type: 'EVENT_CREATED', category: 'event_management', severity: 'INFO', metadata: { eventId: event.id, eventName: event.name } });
+      return event;
+    },
+
+    async update(id: string, data: EventUpdateDTO): Promise<EventSchedule> {
+      const docRef = doc(db, COLLECTIONS.events, id);
+      const payload: Record<string, unknown> = {};
+      if (data.name !== undefined) payload['Name'] = data.name;
+      if (data.description !== undefined) payload['Description'] = data.description;
+      if (data.timeAndDate !== undefined) payload['TimeAndDate'] = data.timeAndDate;
+      if (data.location !== undefined) payload['Location'] = data.location;
+      if (data.scheduledVolunteers !== undefined) payload['ScheduledVolunteers'] = data.scheduledVolunteers;
+      if (data.voluntaryVolunteers !== undefined) payload['VoluntaryVolunteers'] = data.voluntaryVolunteers;
+      if (data.assignedGroups !== undefined) payload['AssignedGroups'] = data.assignedGroups;
+      if (data.isDisabled !== undefined) payload['IsDisabled'] = data.isDisabled;
+      await updateDoc(docRef, withTimestamps(payload));
+      const event = await firestoreService.events.getById(id);
+      await clientWriteLog({ type: 'EVENT_UPDATED', category: 'event_management', severity: 'INFO', metadata: { eventId: id, eventName: event.name } });
+      return event;
+    },
+
+    /** Soft-delete */
+    async delete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.events, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: true }));
+      await clientWriteLog({ type: 'EVENT_DELETED', category: 'event_management', severity: 'INFO', metadata: { eventId: id } });
+    },
+
+    /** Restore — sets IsDisabled = false */
+    async restore(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.events, id);
+      await updateDoc(docRef, withTimestamps({ IsDisabled: false }));
+      await clientWriteLog({ type: 'EVENT_UPDATED', category: 'event_management', severity: 'INFO', metadata: { eventId: id, changeType: 'restored' } });
+    },
+
+    /** Hard delete — permanently removes the document from Firestore */
+    async hardDelete(id: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.events, id);
+      await deleteDoc(docRef);
+      await clientWriteLog({ type: 'EVENT_DELETED', category: 'event_management', severity: 'INFO', metadata: { eventId: id } });
+    },
+
+    async addStatus(eventId: string, data: AddStatusDTO): Promise<EventSchedule> {
+      const docRef = doc(db, COLLECTIONS.events, eventId);
+      await updateDoc(docRef, {
+        ScheduledVolunteers: arrayUnion(data.volunteerID),
+        Statuses: arrayUnion({
+          VolunteerID: data.volunteerID,
+          AssignedAt: new Date().toISOString(),
+        }),
+        LastUpdated: serverTimestamp(),
+      });
+      const event = await firestoreService.events.getById(eventId);
+      await clientWriteLog({ type: 'VOLUNTEER_SCHEDULED', category: 'attendance', severity: 'INFO', metadata: { eventId, eventName: event.name, volunteerId: data.volunteerID } });
+      return event;
+    },
+
+    async updateStatus(
+      eventId: string,
+      volunteerId: string,
+      data: UpdateStatusDTO,
+    ): Promise<EventSchedule> {
+      const event = await firestoreService.events.getById(eventId);
+      const snap = await getDoc(doc(db, COLLECTIONS.events, eventId));
+      const rawStatuses: Record<string, unknown>[] = snap.data()?.Statuses ?? [];
+      const updatedStatuses = rawStatuses.map((s) =>
+        s['VolunteerID'] === volunteerId
+          ? {
+              ...s,
+              ...(data.timeIn !== undefined ? { TimeIn: data.timeIn } : {}),
+              ...(data.attendanceType !== undefined ? { AttendanceType: data.attendanceType } : {}),
+              ...(data.timeOut !== undefined ? { TimeOut: data.timeOut } : {}),
+            }
+          : s,
+      );
+      void event;
+      await updateDoc(doc(db, COLLECTIONS.events, eventId), {
+        Statuses: updatedStatuses,
+        LastUpdated: serverTimestamp(),
+      });
+      await clientWriteLog({ type: 'ATTENDANCE_STATUS_UPDATED', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId, ...(data.attendanceType !== undefined ? { attendanceType: data.attendanceType } : {}) } });
+      return firestoreService.events.getById(eventId);
+    },
+
+    async timeIn(eventId: string, volunteerId: string, data: TimeInDTO): Promise<void> {
+      const snap = await getDoc(doc(db, COLLECTIONS.events, eventId));
+      const rawStatuses: Record<string, unknown>[] = snap.data()?.Statuses ?? [];
+      const updatedStatuses = rawStatuses.map((s) =>
+        s['VolunteerID'] === volunteerId
+          ? { ...s, TimeIn: data.timeIn ?? new Date().toISOString(), TimeInType: data.timeInType }
+          : s,
+      );
+      await updateDoc(doc(db, COLLECTIONS.events, eventId), {
+        Statuses: updatedStatuses,
+        LastUpdated: serverTimestamp(),
+      });
+      await clientWriteLog({ type: 'VOLUNTEER_TIMED_IN', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId, timeIn: data.timeIn ?? new Date().toISOString() } });
+    },
+
+    async timeOut(eventId: string, volunteerId: string, data: TimeOutDTO): Promise<void> {
+      const snap = await getDoc(doc(db, COLLECTIONS.events, eventId));
+      const rawStatuses: Record<string, unknown>[] = snap.data()?.Statuses ?? [];
+      const updatedStatuses = rawStatuses.map((s) =>
+        s['VolunteerID'] === volunteerId
+          ? { ...s, TimeOut: data.timeOut ?? new Date().toISOString(), TimeOutType: data.timeOutType }
+          : s,
+      );
+      await updateDoc(doc(db, COLLECTIONS.events, eventId), {
+        Statuses: updatedStatuses,
+        LastUpdated: serverTimestamp(),
+      });
+      await clientWriteLog({ type: 'VOLUNTEER_TIMED_OUT', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId, timeOut: data.timeOut ?? new Date().toISOString() } });
+    },
+
+    async addDepartments(eventId: string, departmentIds: string[]): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.events, eventId);
+      await updateDoc(docRef, {
+        AssignedGroups: arrayUnion(...departmentIds),
+        LastUpdated: serverTimestamp(),
+      });
+      for (const departmentId of departmentIds) {
+        await clientWriteLog({ type: 'EVENT_DEPARTMENT_ADDED', category: 'event_management', severity: 'INFO', metadata: { eventId, departmentId } });
+      }
+    },
+
+    async removeDepartment(eventId: string, departmentId: string): Promise<void> {
+      const docRef = doc(db, COLLECTIONS.events, eventId);
+      await updateDoc(docRef, {
+        AssignedGroups: arrayRemove(departmentId),
+        LastUpdated: serverTimestamp(),
+      });
+      await clientWriteLog({ type: 'EVENT_DEPARTMENT_REMOVED', category: 'event_management', severity: 'INFO', metadata: { eventId, departmentId } });
+    },
+
+    async removeVolunteer(eventId: string, volunteerId: string): Promise<void> {
+      const snap = await getDoc(doc(db, COLLECTIONS.events, eventId));
+      const rawStatuses: Record<string, unknown>[] = snap.data()?.Statuses ?? [];
+      const toRemove = rawStatuses.find((s) => s['VolunteerID'] === volunteerId);
+      const updates: Record<string, unknown> = {
+        ScheduledVolunteers: arrayRemove(volunteerId),
+        VoluntaryVolunteers: arrayRemove(volunteerId),
+        LastUpdated: serverTimestamp(),
+      };
+      if (toRemove) updates['Statuses'] = arrayRemove(toRemove);
+      await updateDoc(doc(db, COLLECTIONS.events, eventId), updates);
+      await clientWriteLog({ type: 'VOLUNTEER_UNSCHEDULED', category: 'attendance', severity: 'INFO', metadata: { eventId, volunteerId } });
+    },
+
+    /** Returns all events where a given volunteer has a status entry */
+    async getStatusHistoryForVolunteer(volunteerId: string): Promise<EventSchedule[]> {
+      const q = query(
+        collection(db, COLLECTIONS.events),
+        where('ScheduledVolunteers', 'array-contains', volunteerId),
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map((d) => ({
+          id: d.id,
+          ...(convertFirestoreData(d.data()) as Omit<EventSchedule, 'id'>),
+        })) as EventSchedule[];
+    },
+
+    /** Returns all events that have a given department in AssignedGroups */
+    async getStatusHistoryForDepartment(departmentId: string): Promise<EventSchedule[]> {
+      const q = query(
+        collection(db, COLLECTIONS.events),
+        where('AssignedGroups', 'array-contains', departmentId),
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs
+        .map((d) => ({
+          id: d.id,
+          ...(convertFirestoreData(d.data()) as Omit<EventSchedule, 'id'>),
+        })) as EventSchedule[];
+    },
+  },
+
+  // ==========================================================================
+  // Logs (admin read-only via Firestore Security Rules)
+  // Writes happen through Cloud Function onWrite triggers automatically.
+  // ==========================================================================
+  logs: {
+    async getAll(filters?: {
+      logType?: string;
+      volunteerId?: string;
+      eventId?: string;
+      departmentId?: string;
+      includeArchived?: boolean;
+      limit?: number;
+    }) {
+      // Go backend writes PascalCase fields; Cloud Functions are being updated to match.
+      const constraints = [];
+      if (!filters?.includeArchived) {
+        constraints.push(where('IsArchived', '==', false));
+      }
+      if (filters?.logType) constraints.push(where('Type', '==', filters.logType));
+      constraints.push(orderBy('TimeDetected', 'desc'));
+
+      const q = query(collection(db, COLLECTIONS.logs), ...constraints);
+      console.log('[Logs] Fetching with filters:', filters);
+      let snapshot;
+      try {
+        snapshot = await getDocs(q);
+      } catch (err) {
+        console.error('[Logs] getDocs FAILED:', err);
+        throw err;
+      }
+      console.log('[Logs] Raw snapshot size:', snapshot.size);
+      console.log('[Logs] Raw docs (first 3):', snapshot.docs.slice(0, 3).map((d) => ({ id: d.id, ...d.data() })));
+      // convertFirestoreData normalises PascalCase → camelCase and Timestamps → ISO strings.
+      const logs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as object),
+      }));
+      console.log('[Logs] After conversion (first 3):', logs.slice(0, 3));
+      // Client-side entity-scoped filtering (metadata keys are always camelCase)
+      let filtered = logs as Array<Record<string, unknown>>;
+      if (filters?.volunteerId) {
+        filtered = filtered.filter(
+          (l) => (l['metadata'] as Record<string, unknown>)?.['volunteerId'] === filters.volunteerId,
+        );
+      }
+      if (filters?.eventId) {
+        filtered = filtered.filter(
+          (l) => (l['metadata'] as Record<string, unknown>)?.['eventId'] === filters.eventId,
+        );
+      }
+      if (filters?.departmentId) {
+        filtered = filtered.filter(
+          (l) =>
+            (l['metadata'] as Record<string, unknown>)?.['departmentId'] === filters.departmentId,
+        );
+      }
+      const limit = filters?.limit ?? 200;
+      const result = filtered.slice(0, limit);
+      console.log('[Logs] Final result count:', result.length, '| Sample:', result[0]);
+      return result;
+    },
+
+    async getArchivedLogs() {
+      const q = query(
+        collection(db, COLLECTIONS.logs),
+        where('IsArchived', '==', true),
+        orderBy('TimeDetected', 'desc'),
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(convertFirestoreData(d.data()) as object),
+      }));
+    },
+
+    async getStats() {
+      const q = query(collection(db, COLLECTIONS.logs), where('IsArchived', '==', false));
+      const snapshot = await getDocs(q);
+      const logs = snapshot.docs.map((d) => d.data() as Record<string, unknown>);
+      const byType: Record<string, number> = {};
+      const byCategory: Record<string, number> = {};
+      const bySeverity: Record<string, number> = {};
+      let archived = 0;
+      for (const l of logs) {
+        // Handle both PascalCase (Go backend) and camelCase (Cloud Functions) field names.
+        const type = (l['Type'] ?? l['type']) as string | undefined;
+        const category = (l['Category'] ?? l['category']) as string | undefined;
+        const severity = (l['Severity'] ?? l['severity']) as string | undefined;
+        if (type) byType[type] = (byType[type] ?? 0) + 1;
+        if (category) byCategory[category] = (byCategory[category] ?? 0) + 1;
+        if (severity) bySeverity[severity] = (bySeverity[severity] ?? 0) + 1;
+        if (l['IsArchived'] || l['isArchived']) archived++;
+      }
+      const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const recentLogs = logs.filter((l) => {
+        const t = l['TimeDetected'] ?? l['timeDetected'];
+        if (t instanceof Timestamp) return t.toMillis() > oneWeekAgo;
+        return false;
+      }).length;
+      return { totalLogs: logs.length, byType, byCategory, bySeverity, archived, recentLogs };
+    },
+  },
+
+  // ==========================================================================
+  // Batch write helper
+  // ==========================================================================
+  batch: {
+    /** Executes multiple creates atomically using Firestore batched writes (max 500 ops). */
+    async batchCreate(
+      operations: Array<{ collectionPath: string; data: Record<string, unknown> }>,
+    ): Promise<string[]> {
+      const ids: string[] = [];
+      // Firestore allows max 500 writes per batch
+      const BATCH_LIMIT = 500;
+      for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
+        const chunk = operations.slice(i, i + BATCH_LIMIT);
+        const batch = writeBatch(db);
+        for (const op of chunk) {
+          const ref = doc(collection(db, op.collectionPath));
+          batch.set(ref, withCreationTimestamps(op.data));
+          ids.push(ref.id);
+        }
+        await batch.commit();
+      }
+      return ids;
+    },
+  },
 };
+
